@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Daniel Jslin</title><link>/</link><description>May the source be with you</description><atom:link href="/feeds/about.rss.xml" rel="self"></atom:link><lastBuildDate>Thu, 17 Dec 2015 00:00:00 +0800</lastBuildDate><item><title>May The Source Be With You</title><link>/about/may-the-source-be-with-you.html</link><description>&lt;img alt="'may-the-source-be-with-you'" src="/about/may-the-source-be-with-you.jpg" /&gt;
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Daniel Jslin</title><link>https://danielmaker.github.io/blog/</link><description>May the source be with you</description><atom:link href="https://danielmaker.github.io/blog/feeds/about.rss.xml" rel="self"></atom:link><lastBuildDate>Thu, 17 Dec 2015 00:00:00 +0800</lastBuildDate><item><title>May The Source Be With You</title><link>https://danielmaker.github.io/blog/about/may-the-source-be-with-you.html</link><description>&lt;img alt="'may-the-source-be-with-you'" src="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.jpg" /&gt;
 &lt;p&gt;image by anonymous&lt;/p&gt;
 &lt;p&gt;對軟體工程師而言，我們很幸運生在一個開放源始碼如此蓬勃發展的時代，有許多優秀的開源軟體專案可以讓我們好好利用及研究。
 就如同一個優秀的文學家經由閱讀其他文學大師的作品來提升自已一樣，軟體工程師也是經由觀摩其他優秀的軟體設計來讓自已的能力提升。
@@ -8,4 +8,4 @@
 這兩點正是本部落格的目標：藉由分析並學習優秀的開源軟體設計來讓自已的能力提升；藉由分享帶來回饋與交流，形成一個正向循環。&lt;/p&gt;
 &lt;p&gt;開源軟體就如同 Star Wars 裡絕地武士的原力一般，如果我們對它夠了解，它將會給我們帶來力量，
 它就是我們軟體工程師的原力來源。 May the source be with you.&lt;/p&gt;
-</description><dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">Daniel Lin</dc:creator><pubDate>Thu, 17 Dec 2015 00:00:00 +0800</pubDate><guid>tag:,2015-12-17:about/may-the-source-be-with-you.html</guid></item></channel></rss>
+</description><dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">Daniel Lin</dc:creator><pubDate>Thu, 17 Dec 2015 00:00:00 +0800</pubDate><guid>tag:danielmaker.github.io,2015-12-17:blog/about/may-the-source-be-with-you.html</guid></item></channel></rss>

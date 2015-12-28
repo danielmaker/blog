@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="/" rel="alternate"></link><link href="/feeds/all.atom.xml" rel="self"></link><id>/</id><updated>2015-12-24T00:00:00+08:00</updated><entry><title>Linux Kernel 探險地圖</title><link href="/linux/linux_kernel_beginning.html" rel="alternate"></link><updated>2015-12-24T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:,2015-12-24:linux/linux_kernel_beginning.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="https://danielmaker.github.io/blog/" rel="alternate"></link><link href="https://danielmaker.github.io/blog/feeds/all.atom.xml" rel="self"></link><id>https://danielmaker.github.io/blog/</id><updated>2015-12-24T00:00:00+08:00</updated><entry><title>Linux Kernel 探險地圖</title><link href="https://danielmaker.github.io/blog/linux/linux_kernel_beginning.html" rel="alternate"></link><updated>2015-12-24T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2015-12-24:blog/linux/linux_kernel_beginning.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
 &lt;style type="text/css"&gt;
     .red    { color: red;   }
     .blue   { color: blue;  }
@@ -195,7 +195,7 @@ Linux kernel mailing list 是核心開發社群主要的溝通管道，若想追
 &lt;li&gt;&lt;a class="reference external" href="http://lwn.net/Distributions/"&gt;LWN: Linux Distribution List&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/div&gt;
-</summary><category term="Linux kernel"></category></entry><entry><title>May The Source Be With You</title><link href="/about/may-the-source-be-with-you.html" rel="alternate"></link><updated>2015-12-17T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:,2015-12-17:about/may-the-source-be-with-you.html</id><summary type="html">&lt;img alt="'may-the-source-be-with-you'" src="/about/may-the-source-be-with-you.jpg" /&gt;
+</summary><category term="Linux kernel"></category></entry><entry><title>May The Source Be With You</title><link href="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.html" rel="alternate"></link><updated>2015-12-17T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2015-12-17:blog/about/may-the-source-be-with-you.html</id><summary type="html">&lt;img alt="'may-the-source-be-with-you'" src="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.jpg" /&gt;
 &lt;p&gt;image by anonymous&lt;/p&gt;
 &lt;p&gt;對軟體工程師而言，我們很幸運生在一個開放源始碼如此蓬勃發展的時代，有許多優秀的開源軟體專案可以讓我們好好利用及研究。
 就如同一個優秀的文學家經由閱讀其他文學大師的作品來提升自已一樣，軟體工程師也是經由觀摩其他優秀的軟體設計來讓自已的能力提升。
