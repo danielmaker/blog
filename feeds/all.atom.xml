@@ -1,5 +1,201 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="/" rel="alternate"></link><link href="/feeds/all.atom.xml" rel="self"></link><id>/</id><updated>2015-12-17T00:00:00+08:00</updated><entry><title>May The Source Be With You</title><link href="/about/may-the-source-be-with-you.html" rel="alternate"></link><updated>2015-12-17T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:,2015-12-17:about/may-the-source-be-with-you.html</id><summary type="html">&lt;img alt="'may-the-source-be-with-you'" src="/about/may-the-source-be-with-you.jpg" /&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="/" rel="alternate"></link><link href="/feeds/all.atom.xml" rel="self"></link><id>/</id><updated>2015-12-24T00:00:00+08:00</updated><entry><title>Linux Kernel 探險地圖</title><link href="/linux/linux_kernel_beginning.html" rel="alternate"></link><updated>2015-12-24T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:,2015-12-24:linux/linux_kernel_beginning.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
+&lt;style type="text/css"&gt;
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+&lt;/style&gt;&lt;style type="text/css"&gt;
+
+.source-tree
+{
+    line-height: 100%;
+        color: #000000;
+        background: #eeeeee;
+}
+
+&lt;/style&gt;&lt;!-- ............................................................................. --&gt;
+&lt;p&gt;Linux kernel 就像是一個龐大的迷宮，如果沒有適當的引導，常讓想要了解它的新手不知道要如何開始。
+所幸，Linux kernel 是指標性的開放源碼專案，有許多的前輩高人留下相當多的資料，也有許多人持續在研究它，並且將成果及心得公開在網路上，這對有心想要了解它的人是很好的參考資料來源。&lt;/p&gt;
+&lt;p&gt;雖然網路上已經有許多資料可供參考，但是它們沒辦法也沒必要解答我所有的疑問，許多細節之處必須親身碰過才會有感覺。
+像我這樣對 Linux kernel 有與趣，想了解它是如何運作及如何被設計的人，我需要有一份屬於自已的地圖，將我所探險過的地方及心得記錄下來，讓我之後可以快速回顧。&lt;/p&gt;
+&lt;p&gt;我把這樣的記錄稱為核心探險地圖，因為對我而言，比起單純的文字，圖表總是更容易把一些關鍵之處連結起來。
+當然，為了能和社群互相交流，這樣的記錄最好能夠稍加整理一下，將它分享出來，讓其他像我一樣有興趣的人能夠參考，一起學習，互相交流。&lt;/p&gt;
+&lt;p&gt;在出發探險之前，先讓我們看看有什麼資料可以幫助我們。
+本篇收集了一些關於學習 Linux kernel 相關的資源。&lt;/p&gt;
+&lt;div class="section" id="source-code"&gt;
+&lt;h2&gt;Source Code&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;官方網站 The Linux Kernel Archives: &lt;a class="reference external" href="https://kernel.org"&gt;https://kernel.org&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Github: &lt;a class="reference external" href="https://github.com/torvalds/linux"&gt;https://github.com/torvalds/linux&lt;/a&gt; (這邊應該只是 mirror)&lt;/li&gt;
+&lt;li&gt;Linux Cross Reference: &lt;a class="reference external" href="http://lxr.free-electrons.com"&gt;http://lxr.free-electrons.com&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;woboq code browser : &lt;a class="reference external" href="http://code.woboq.org/linux/"&gt;http://code.woboq.org/linux/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在將 Linux kernel source 下載下來之後，第一眼看到的是它的目錄結構，這些目錄代表核心主要的組成元件，了解各個目錄所代表的意義可以更容易找到對應功能的程式碼，這對在核心中探險的我們十分有幫助。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre class="source-tree literal-block"&gt;
+  Linux
+  ├── README
+  ├── Documentation
+  ├── include          // include files needed to build the kernel code
+  ├── lib              // kernel's library code
+  ├── init             // initialization code for the kernel
+  │   └── &lt;span class="blue-b"&gt;main.c&lt;/span&gt;       // start_kernel()
+  ├── arch             // architecture specific kernel code
+  │   └── *
+  │       ├── configs
+  │       ├── include
+  │       ├── lib
+  │       ├── boot
+  │       ├── kernel
+  │       ├── mm
+  │       ├── net
+  │       ├── pci
+  │       └── crypto
+  ├── kernel           // main kernel code
+  │   ├── cpu
+  │   ├── irq
+  │   ├── time
+  │   ├── sched
+  │   ├── events
+  │   ├── power
+  │   ├── debug
+  │   │&amp;nbsp;&amp;nbsp; └── kdb
+  │   ├── gcov
+  │   ├── printk
+  │   └── trace
+  ├── mm               // memory management
+  ├── fs               // file system
+  ├── firmware
+  ├── drivers          // device drivers
+  ├── block            // block-device drivers
+  ├── sound            // sound drivers
+  ├── crypto           // encryption algorithms
+  ├── ipc              // inter-process communication
+  ├── net              // network protocols
+  ├── scripts          // scripts (for example awk and tk scripts) that are used when the kernel is configured
+  ├── security         // the security of the kernel
+  ├── tools            // the tools that interact with the kernel
+  ├── samples          // programming examples
+  ├── usr
+  └── virt             // virtualization
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;要更進一步了解關於 Linux kernel source 的目錄結構，Devyn Johnson 有非常詳細的介紹，值得一讀:
+&lt;a class="reference external" href="http://www.linux.org/threads/the-linux-kernel-the-source-code.4204/"&gt;How the Linux source code is arranged.&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="section" id="kernel-versions"&gt;
+&lt;h3&gt;Kernel versions&lt;/h3&gt;
+&lt;p&gt;想要了解每個核心版本新增了什麼功能，有什麼變動，可以參考 Linux Kernel Newbies 針對各個核心版本所整理的說明:
+&lt;a class="reference external" href="http://kernelnewbies.org/LinuxVersions"&gt;http://kernelnewbies.org/LinuxVersions&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="documentation"&gt;
+&lt;h2&gt;Documentation&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;Linux kernel release note: &lt;a class="reference external" href="https://www.kernel.org/doc/readme/README"&gt;README&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;雖說是 release note，但這份文件並沒有列出版本相關的主要變動，它簡單介紹如何設定及編譯 kernel。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;核心內部的文件: &lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/"&gt;https://www.kernel.org/doc/Documentation/&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;這些文件說明核心內部各個部份的設計，以及核心的設計原則等。對要參與核心開發的人，這是屬於必讀的文件。&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/00-INDEX"&gt;Documentation/00-INDEX&lt;/a&gt;
+簡介在 Documentation 目錄下各文件及子目錄的內容&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/HOWTO"&gt;HOWTO do Linux kernel development&lt;/a&gt;
+(&lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/zh_CN/HOWTO"&gt;簡體中文版&lt;/a&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;&lt;a class="reference external" href="https://www.kernel.org/doc/htmldocs/"&gt;Kernel APIs&lt;/a&gt;
+整理了各個子系統內部所使用的函式說明，是在追蹤核心程式碼時非常好的參考資料。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="section" id="make-targets"&gt;
+&lt;h2&gt;Make Targets&lt;/h2&gt;
+&lt;p&gt;這份在 Linux kernel 中的文件說明各個 make target 所代表的意義:
+&lt;a class="reference external" href="https://www.kernel.org/doc/makehelp.txt"&gt;https://www.kernel.org/doc/makehelp.txt&lt;/a&gt; (事實上，它是 make help 的輸出內容)&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;table class="docutils field-list" frame="void" rules="none"&gt;
+&lt;col class="field-name" /&gt;
+&lt;col class="field-body" /&gt;
+&lt;tbody valign="top"&gt;
+&lt;tr class="field"&gt;&lt;th class="field-name"&gt;defconfig:&lt;/th&gt;&lt;td class="field-body"&gt;New config with default from ARCH supplied defconfig&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class="field"&gt;&lt;th class="field-name"&gt;menuconfig:&lt;/th&gt;&lt;td class="field-body"&gt;Text based color menus, radiolists &amp;amp; dialogs&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class="field"&gt;&lt;th class="field-name"&gt;oldconfig:&lt;/th&gt;&lt;td class="field-body"&gt;Update current config utilising a provided .config as base&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class="field"&gt;&lt;th class="field-name"&gt;tags/TAGS:&lt;/th&gt;&lt;td class="field-body"&gt;Generate tags file for editors&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class="field"&gt;&lt;th class="field-name"&gt;cscope:&lt;/th&gt;&lt;td class="field-body"&gt;Generate cscope index&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;tags 及 cscope 可以配合 vim 來瀏覽核心程式碼，可以參考這篇的說明:
+&lt;a class="reference external" href="http://www.cmlab.csie.ntu.edu.tw/~daniel/linux/vim_source_navigation.html"&gt;VIM source navigator&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="news"&gt;
+&lt;h2&gt;News&lt;/h2&gt;
+&lt;p&gt;要了解 Linux kernel，LWN 是不能錯過的。它的內容包含開放源碼軟體相關的新聞，及 Linux kernel 的開發狀況，而更棒的是它有許多文章解釋 kernel 的設計，是非常好的參考資料來源。
+Linux kernel mailing list 是核心開發社群主要的溝通管道，若想追最新的開發狀況，或是參與核心開發的討論，那就是要訂閱它。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;Linux Weeky News (LWN): &lt;a class="reference external" href="https://lwn.net/"&gt;https://lwn.net/&lt;/a&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;LWN 根據主題整理的列表 : &lt;a class="reference external" href="http://lwn.net/Kernel/Index/"&gt;http://lwn.net/Kernel/Index/&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;這個有點類似精華區，收集了許多說明核心內部設計的文章&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Linux kernel mailing list: &lt;a class="reference external" href="https://lkml.org/"&gt;https://lkml.org/&lt;/a&gt;&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.tux.org/lkml/"&gt;Linux Kernel Mailing List FAQ&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://coldnew.github.io/blog/2013/12-19_76c4a/"&gt;codenew: 如何訂閱 Linux Kernel mailing-list&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="section" id="books"&gt;
+&lt;h2&gt;Books&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.oreilly.com.tw/product_linux.php?id=a194"&gt;Understanding the Linux Kernel&lt;/a&gt; (by Daniel P. Bovet, Marco Cesati)&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.amazon.com/Linux-Kernel-Development-3rd-Edition/dp/0672329468"&gt;Linux Kernel Development&lt;/a&gt; (by Robert Love)&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.wrox.com/WileyCDA/WroxTitle/Professional-Linux-Kernel-Architecture.productCd-0470343435.html"&gt;Professional Linux Kernel Architecture&lt;/a&gt; (by Wolfgang Mauerer)&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://blog.nutsfactory.net/2011/03/17/10-linux-kernel-books/"&gt;Rex: 十本 Linux 核心開發書籍介紹&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="section" id="statistic"&gt;
+&lt;h2&gt;Statistic&lt;/h2&gt;
+&lt;p&gt;下面的網站收集了一些每個版本發布時的統計資料(核心主要的貢獻者及其雇主)，其來源是分析每個提交(commit)上的資料。&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.remword.com/kps_result/"&gt;Linux Kernel Patch Statistic&lt;/a&gt; (統計貢獻者及其雇主)&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.remword.com/kps_result/evolvement.php"&gt;Graphic Kernel Evolvement&lt;/a&gt; (統計每個版本改動的數量)&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.linuxcounter.net/statistics/kernel"&gt;Linux Counter: Lines of code per kernel version&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://kernelnewbies.org/DevelopmentStatistics"&gt;http://kernelnewbies.org/DevelopmentStatistics&lt;/a&gt; (LWN 每個版本發佈時的統計報告)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="section" id="reference"&gt;
+&lt;h2&gt;Reference&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://en.wikipedia.org/wiki/Linux_kernel"&gt;https://en.wikipedia.org/wiki/Linux_kernel&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Linux kernel 新手村: &lt;a class="reference external" href="http://kernelnewbies.org"&gt;http://kernelnewbies.org&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.linux.org/threads/linux-kernel-reading-guide.5384/"&gt;Devyn Johnson: Linux Kernel Reading Guide&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.makelinux.net/"&gt;http://www.makelinux.net/&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.makelinux.net/kernel_map/"&gt;Interactive map of Linux kernel&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.makelinux.net/reference"&gt;http://www.makelinux.net/reference&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.makelinux.net/books/lkd2"&gt;http://www.makelinux.net/books/lkd2&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.ibm.com/developerworks/views/linux/libraryview.jsp"&gt;IBM Developerworks Linux Library&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://www.ibm.com/developerworks/linux/library/l-linux-kernel/"&gt;IBM Developerworks: Anatomy of the Linux kernel&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel Planet (部落格聯播): &lt;a class="reference external" href="http://kernelplanet.org/"&gt;http://kernelplanet.org/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://lwn.net/Distributions/"&gt;LWN: Linux Distribution List&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+</summary><category term="Linux kernel"></category></entry><entry><title>May The Source Be With You</title><link href="/about/may-the-source-be-with-you.html" rel="alternate"></link><updated>2015-12-17T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:,2015-12-17:about/may-the-source-be-with-you.html</id><summary type="html">&lt;img alt="'may-the-source-be-with-you'" src="/about/may-the-source-be-with-you.jpg" /&gt;
 &lt;p&gt;image by anonymous&lt;/p&gt;
 &lt;p&gt;對軟體工程師而言，我們很幸運生在一個開放源始碼如此蓬勃發展的時代，有許多優秀的開源軟體專案可以讓我們好好利用及研究。
 就如同一個優秀的文學家經由閱讀其他文學大師的作品來提升自已一樣，軟體工程師也是經由觀摩其他優秀的軟體設計來讓自已的能力提升。

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Linux Kernel 探險地圖 &mdash; Daniel Jslin</title>
+  <meta name="author" content="Daniel Lin">
+
+  <link href="/feeds/atom.xml" type="application/atom+xml" rel="alternate"
+        title="Daniel Jslin Atom Feed" />
+  <link href="/feeds/rss.xml" type="application/rss+xml" rel="alternate"
+        title="Daniel Jslin RSS Feed" />
+
+
+
+
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <link href="/favicon.png" rel="icon">
+
+  <link href="/theme/css/main.css" media="screen, projection"
+        rel="stylesheet" type="text/css">
+
+  <link href="//fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+  <link href="//fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+</head>
+
+<body>
+  <header role="banner"><hgroup>
+  <h1><a href="/">Daniel Jslin</a></h1>
+    <h2>May the source be with you</h2>
+</hgroup></header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/feeds/atom.xml" rel="subscribe-atom">Atom</a></li>
+  <li><a href="/feeds/rss.xml" rel="subscribe-rss">RSS</a></li>
+</ul>
+
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+
+<ul class="main-navigation">
+      <li >
+        <a href="/category/about.html">About</a>
+      </li>
+      <li class="active">
+        <a href="/category/linux.html">Linux</a>
+      </li>
+</ul></nav>
+  <div id="main">
+    <div id="content">
+<div>
+  <article class="hentry" role="article">
+<header>
+      <h1 class="entry-title">Linux Kernel 探險地圖</h1>
+    <p class="meta">
+<time datetime="2015-12-24T00:00:00+08:00" pubdate>2015-12-24, Thu</time>    </p>
+</header>
+
+  <div class="entry-content"><!-- ............................................................................. -->
+<style type="text/css">
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+</style><style type="text/css">
+
+.source-tree
+{
+    line-height: 100%;
+        color: #000000;
+        background: #eeeeee;
+}
+
+</style><!-- ............................................................................. -->
+<p>Linux kernel 就像是一個龐大的迷宮，如果沒有適當的引導，常讓想要了解它的新手不知道要如何開始。
+所幸，Linux kernel 是指標性的開放源碼專案，有許多的前輩高人留下相當多的資料，也有許多人持續在研究它，並且將成果及心得公開在網路上，這對有心想要了解它的人是很好的參考資料來源。</p>
+<p>雖然網路上已經有許多資料可供參考，但是它們沒辦法也沒必要解答我所有的疑問，許多細節之處必須親身碰過才會有感覺。
+像我這樣對 Linux kernel 有與趣，想了解它是如何運作及如何被設計的人，我需要有一份屬於自已的地圖，將我所探險過的地方及心得記錄下來，讓我之後可以快速回顧。</p>
+<p>我把這樣的記錄稱為核心探險地圖，因為對我而言，比起單純的文字，圖表總是更容易把一些關鍵之處連結起來。
+當然，為了能和社群互相交流，這樣的記錄最好能夠稍加整理一下，將它分享出來，讓其他像我一樣有興趣的人能夠參考，一起學習，互相交流。</p>
+<p>在出發探險之前，先讓我們看看有什麼資料可以幫助我們。
+本篇收集了一些關於學習 Linux kernel 相關的資源。</p>
+<div class="section" id="source-code">
+<h2>Source Code</h2>
+<ul class="simple">
+<li>官方網站 The Linux Kernel Archives: <a class="reference external" href="https://kernel.org">https://kernel.org</a></li>
+<li>Github: <a class="reference external" href="https://github.com/torvalds/linux">https://github.com/torvalds/linux</a> (這邊應該只是 mirror)</li>
+<li>Linux Cross Reference: <a class="reference external" href="http://lxr.free-electrons.com">http://lxr.free-electrons.com</a></li>
+<li>woboq code browser : <a class="reference external" href="http://code.woboq.org/linux/">http://code.woboq.org/linux/</a></li>
+</ul>
+<p>在將 Linux kernel source 下載下來之後，第一眼看到的是它的目錄結構，這些目錄代表核心主要的組成元件，了解各個目錄所代表的意義可以更容易找到對應功能的程式碼，這對在核心中探險的我們十分有幫助。</p>
+<blockquote>
+<pre class="source-tree literal-block">
+  Linux
+  ├── README
+  ├── Documentation
+  ├── include          // include files needed to build the kernel code
+  ├── lib              // kernel's library code
+  ├── init             // initialization code for the kernel
+  │   └── <span class="blue-b">main.c</span>       // start_kernel()
+  ├── arch             // architecture specific kernel code
+  │   └── *
+  │       ├── configs
+  │       ├── include
+  │       ├── lib
+  │       ├── boot
+  │       ├── kernel
+  │       ├── mm
+  │       ├── net
+  │       ├── pci
+  │       └── crypto
+  ├── kernel           // main kernel code
+  │   ├── cpu
+  │   ├── irq
+  │   ├── time
+  │   ├── sched
+  │   ├── events
+  │   ├── power
+  │   ├── debug
+  │   │&nbsp;&nbsp; └── kdb
+  │   ├── gcov
+  │   ├── printk
+  │   └── trace
+  ├── mm               // memory management
+  ├── fs               // file system
+  ├── firmware
+  ├── drivers          // device drivers
+  ├── block            // block-device drivers
+  ├── sound            // sound drivers
+  ├── crypto           // encryption algorithms
+  ├── ipc              // inter-process communication
+  ├── net              // network protocols
+  ├── scripts          // scripts (for example awk and tk scripts) that are used when the kernel is configured
+  ├── security         // the security of the kernel
+  ├── tools            // the tools that interact with the kernel
+  ├── samples          // programming examples
+  ├── usr
+  └── virt             // virtualization
+</pre>
+</blockquote>
+<ul class="simple">
+<li>要更進一步了解關於 Linux kernel source 的目錄結構，Devyn Johnson 有非常詳細的介紹，值得一讀:
+<a class="reference external" href="http://www.linux.org/threads/the-linux-kernel-the-source-code.4204/">How the Linux source code is arranged.</a></li>
+</ul>
+<div class="section" id="kernel-versions">
+<h3>Kernel versions</h3>
+<p>想要了解每個核心版本新增了什麼功能，有什麼變動，可以參考 Linux Kernel Newbies 針對各個核心版本所整理的說明:
+<a class="reference external" href="http://kernelnewbies.org/LinuxVersions">http://kernelnewbies.org/LinuxVersions</a></p>
+</div>
+</div>
+<div class="section" id="documentation">
+<h2>Documentation</h2>
+<ul>
+<li><p class="first">Linux kernel release note: <a class="reference external" href="https://www.kernel.org/doc/readme/README">README</a></p>
+<p>雖說是 release note，但這份文件並沒有列出版本相關的主要變動，它簡單介紹如何設定及編譯 kernel。</p>
+</li>
+<li><p class="first">核心內部的文件: <a class="reference external" href="https://www.kernel.org/doc/Documentation/">https://www.kernel.org/doc/Documentation/</a></p>
+<p>這些文件說明核心內部各個部份的設計，以及核心的設計原則等。對要參與核心開發的人，這是屬於必讀的文件。</p>
+<ul class="simple">
+<li><a class="reference external" href="https://www.kernel.org/doc/Documentation/00-INDEX">Documentation/00-INDEX</a>
+簡介在 Documentation 目錄下各文件及子目錄的內容</li>
+<li><a class="reference external" href="https://www.kernel.org/doc/Documentation/HOWTO">HOWTO do Linux kernel development</a>
+(<a class="reference external" href="https://www.kernel.org/doc/Documentation/zh_CN/HOWTO">簡體中文版</a>)</li>
+</ul>
+</li>
+<li><p class="first"><a class="reference external" href="https://www.kernel.org/doc/htmldocs/">Kernel APIs</a>
+整理了各個子系統內部所使用的函式說明，是在追蹤核心程式碼時非常好的參考資料。</p>
+</li>
+</ul>
+</div>
+<div class="section" id="make-targets">
+<h2>Make Targets</h2>
+<p>這份在 Linux kernel 中的文件說明各個 make target 所代表的意義:
+<a class="reference external" href="https://www.kernel.org/doc/makehelp.txt">https://www.kernel.org/doc/makehelp.txt</a> (事實上，它是 make help 的輸出內容)</p>
+<blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">defconfig:</th><td class="field-body">New config with default from ARCH supplied defconfig</td>
+</tr>
+<tr class="field"><th class="field-name">menuconfig:</th><td class="field-body">Text based color menus, radiolists &amp; dialogs</td>
+</tr>
+<tr class="field"><th class="field-name">oldconfig:</th><td class="field-body">Update current config utilising a provided .config as base</td>
+</tr>
+<tr class="field"><th class="field-name">tags/TAGS:</th><td class="field-body">Generate tags file for editors</td>
+</tr>
+<tr class="field"><th class="field-name">cscope:</th><td class="field-body">Generate cscope index</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+<p>tags 及 cscope 可以配合 vim 來瀏覽核心程式碼，可以參考這篇的說明:
+<a class="reference external" href="http://www.cmlab.csie.ntu.edu.tw/~daniel/linux/vim_source_navigation.html">VIM source navigator</a></p>
+</div>
+<div class="section" id="news">
+<h2>News</h2>
+<p>要了解 Linux kernel，LWN 是不能錯過的。它的內容包含開放源碼軟體相關的新聞，及 Linux kernel 的開發狀況，而更棒的是它有許多文章解釋 kernel 的設計，是非常好的參考資料來源。
+Linux kernel mailing list 是核心開發社群主要的溝通管道，若想追最新的開發狀況，或是參與核心開發的討論，那就是要訂閱它。</p>
+<ul>
+<li><p class="first">Linux Weeky News (LWN): <a class="reference external" href="https://lwn.net/">https://lwn.net/</a></p>
+<ul>
+<li><p class="first">LWN 根據主題整理的列表 : <a class="reference external" href="http://lwn.net/Kernel/Index/">http://lwn.net/Kernel/Index/</a></p>
+<p>這個有點類似精華區，收集了許多說明核心內部設計的文章</p>
+</li>
+</ul>
+</li>
+<li><p class="first">Linux kernel mailing list: <a class="reference external" href="https://lkml.org/">https://lkml.org/</a></p>
+<ul class="simple">
+<li><a class="reference external" href="http://www.tux.org/lkml/">Linux Kernel Mailing List FAQ</a></li>
+<li><a class="reference external" href="http://coldnew.github.io/blog/2013/12-19_76c4a/">codenew: 如何訂閱 Linux Kernel mailing-list</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="books">
+<h2>Books</h2>
+<ul class="simple">
+<li><a class="reference external" href="http://www.oreilly.com.tw/product_linux.php?id=a194">Understanding the Linux Kernel</a> (by Daniel P. Bovet, Marco Cesati)</li>
+<li><a class="reference external" href="http://www.amazon.com/Linux-Kernel-Development-3rd-Edition/dp/0672329468">Linux Kernel Development</a> (by Robert Love)</li>
+<li><a class="reference external" href="http://www.wrox.com/WileyCDA/WroxTitle/Professional-Linux-Kernel-Architecture.productCd-0470343435.html">Professional Linux Kernel Architecture</a> (by Wolfgang Mauerer)</li>
+<li><a class="reference external" href="http://blog.nutsfactory.net/2011/03/17/10-linux-kernel-books/">Rex: 十本 Linux 核心開發書籍介紹</a></li>
+</ul>
+</div>
+<div class="section" id="statistic">
+<h2>Statistic</h2>
+<p>下面的網站收集了一些每個版本發布時的統計資料(核心主要的貢獻者及其雇主)，其來源是分析每個提交(commit)上的資料。</p>
+<ul class="simple">
+<li><a class="reference external" href="http://www.remword.com/kps_result/">Linux Kernel Patch Statistic</a> (統計貢獻者及其雇主)</li>
+<li><a class="reference external" href="http://www.remword.com/kps_result/evolvement.php">Graphic Kernel Evolvement</a> (統計每個版本改動的數量)</li>
+<li><a class="reference external" href="https://www.linuxcounter.net/statistics/kernel">Linux Counter: Lines of code per kernel version</a></li>
+<li><a class="reference external" href="http://kernelnewbies.org/DevelopmentStatistics">http://kernelnewbies.org/DevelopmentStatistics</a> (LWN 每個版本發佈時的統計報告)</li>
+</ul>
+</div>
+<div class="section" id="reference">
+<h2>Reference</h2>
+<ul class="simple">
+<li><a class="reference external" href="https://en.wikipedia.org/wiki/Linux_kernel">https://en.wikipedia.org/wiki/Linux_kernel</a></li>
+<li>Linux kernel 新手村: <a class="reference external" href="http://kernelnewbies.org">http://kernelnewbies.org</a></li>
+<li><a class="reference external" href="http://www.linux.org/threads/linux-kernel-reading-guide.5384/">Devyn Johnson: Linux Kernel Reading Guide</a></li>
+<li><a class="reference external" href="http://www.makelinux.net/">http://www.makelinux.net/</a><ul>
+<li><a class="reference external" href="http://www.makelinux.net/kernel_map/">Interactive map of Linux kernel</a></li>
+<li><a class="reference external" href="http://www.makelinux.net/reference">http://www.makelinux.net/reference</a></li>
+<li><a class="reference external" href="http://www.makelinux.net/books/lkd2">http://www.makelinux.net/books/lkd2</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="http://www.ibm.com/developerworks/views/linux/libraryview.jsp">IBM Developerworks Linux Library</a></li>
+<li><a class="reference external" href="http://www.ibm.com/developerworks/linux/library/l-linux-kernel/">IBM Developerworks: Anatomy of the Linux kernel</a></li>
+<li>Kernel Planet (部落格聯播): <a class="reference external" href="http://kernelplanet.org/">http://kernelplanet.org/</a></li>
+<li><a class="reference external" href="http://lwn.net/Distributions/">LWN: Linux Distribution List</a></li>
+</ul>
+</div>
+</div>
+    <footer>
+<p class="meta">
+  <span class="byline author vcard">
+    Posted by <span class="fn">
+        Daniel Lin
+    </span>
+  </span>
+<time datetime="2015-12-24T00:00:00+08:00" pubdate>2015-12-24, Thu</time>  <span class="categories">
+    <a class='category' href='/category/linux.html'>Linux</a>
+  </span>
+  <span class="categories">
+    <a class="category" href="/tag/linux-kernel.html">Linux kernel</a>  </span>
+</p><div class="sharing">
+</div>    </footer>
+  </article>
+
+</div>
+<aside class="sidebar">
+  <section>
+    <h1>Recent Posts</h1>
+    <ul id="recent_posts">
+      <li class="post">
+          <a href="/linux/linux_kernel_beginning.html">Linux Kernel 探險地圖</a>
+      </li>
+      <li class="post">
+          <a href="/about/may-the-source-be-with-you.html">May The Source Be With You</a>
+      </li>
+    </ul>
+  </section>
+  <section>
+      
+    <h1>Categories</h1>
+    <ul id="recent_posts">
+        <li><a href="/category/about.html">About</a></li>
+        <li><a href="/category/linux.html">Linux</a></li>
+    </ul>
+  </section>
+ 
+
+  <section>
+  <h1>Tags</h1>
+    <a href="/tag/linux-kernel.html">Linux kernel</a>  </section>
+
+
+
+
+  <!-- Creative Commons 授權條款 -->
+  <a target="_blank" class="svg" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW" style="display: inline-block;"
+     title="姓名標示-非商業性-相同方式分享 4.0"><object alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" data="/theme/images/by-nc-sa.svg" type="image/svg+xml" style="pointer-events: none;">/theme/images/by-nc-sa.svg</object></a>
+  <!-- Creative Commons 授權條款 -->
+</aside>    </div>
+  </div>
+  <footer role="contentinfo"><p>
+
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0"><img alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" src="/theme/images/cc-by-nc-sa-88x31.png" border="0" /></a>
+
+    Copyright &copy;  2015  Daniel Lin &mdash;
+
+  <!-- Creative Commons 授權條款 -->
+  本著作係採用
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0">Creative Commons BY-NC-SA 條款</a> 授權.
+  <!-- Creative Commons 授權條款 -->
+
+  <span class="credit">Powered by <a href="http://getpelican.com">Pelican</a></span>
+</p></footer>
+  <script src="/theme/js/modernizr-2.0.js"></script>
+  <script src="/theme/js/ender.js"></script>
+  <script src="/theme/js/octopress.js" type="text/javascript"></script>
+</body>
+</html>
