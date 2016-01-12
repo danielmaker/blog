@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>核心的進入點: start_kernel() &mdash; Daniel Jslin</title>
+  <meta name="author" content="Daniel Lin">
+
+  <link href="https://danielmaker.github.io/blog/feeds/atom.xml" type="application/atom+xml" rel="alternate"
+        title="Daniel Jslin Atom Feed" />
+  <link href="https://danielmaker.github.io/blog/feeds/rss.xml" type="application/rss+xml" rel="alternate"
+        title="Daniel Jslin RSS Feed" />
+
+
+
+
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <link href="https://danielmaker.github.io/blog/favicon.png" rel="icon">
+
+  <link href="https://danielmaker.github.io/blog/theme/css/main.css" media="screen, projection"
+        rel="stylesheet" type="text/css">
+
+  <link href="//fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+  <link href="//fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+</head>
+
+<body>
+  <header role="banner"><hgroup>
+  <h1><a href="https://danielmaker.github.io/blog/">Daniel Jslin</a></h1>
+    <h2>May the source be with you</h2>
+</hgroup></header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="https://danielmaker.github.io/blog/feeds/atom.xml" rel="subscribe-atom">Atom</a></li>
+  <li><a href="https://danielmaker.github.io/blog/feeds/rss.xml" rel="subscribe-rss">RSS</a></li>
+</ul>
+
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="danielmaker.github.io/blog">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+
+<ul class="main-navigation">
+      <li >
+        <a href="https://danielmaker.github.io/blog/category/about.html">About</a>
+      </li>
+      <li class="active">
+        <a href="https://danielmaker.github.io/blog/category/linux.html">Linux</a>
+      </li>
+</ul></nav>
+  <div id="main">
+    <div id="content">
+<div>
+  <article class="hentry" role="article">
+<header>
+      <h1 class="entry-title">核心的進入點: start_kernel()</h1>
+    <p class="meta">
+<time datetime="2016-01-12T00:00:00+08:00" pubdate>2016-01-12, Tue</time>    </p>
+</header>
+
+  <div class="entry-content"><!-- ............................................................................. -->
+<style type="text/css">
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+    .diagram {line-height: 1;}
+</style><!-- ............................................................................. -->
+<!--  -->
+<blockquote>
+<object class="diagram" data="https://danielmaker.github.io/blog/linux/images/start_kernel_call_graph.svg" style="width: 100%;" type="image/svg+xml">
+</object>
+<a style="font-size: 75%;" href="https://danielmaker.github.io/blog/linux/images/start_kernel_call_graph.svg">larger call graph</a></blockquote>
+<div class="section" id="id1">
+<h2>start_kernel</h2>
+<p>start_kernel() 是 Linux kernel &quot;正式的&quot;進入點，但是 start_kernel()
+通常不是在核心被載入後就立刻被執行，在它開始執行之前還有些準備工作要先完成。
+在核心被載入後，通常最開始被執行的是的放在 Linux kernel image 最開頭的 bootstrap code, 負責關閉中斷，記憶體設定等硬體初始化準備工作，甚至還包含將壓縮的內核解壓縮。
+這些 bootstrap code 是屬於平台架構相依的，它通常是位於 arch/xxx/boot/ 之下的 assembly code
+(xxx 可以是 x86 或是 arm 等)。嚴格來說，這些 bootstrap code 並不能算是 Linux kernel 的一部份，
+它們在完成核心載入的任務之後就不需要了，在這之後才是開始執行 start_kernel()，開始屬於核心層級的初始化流程。</p>
+<p>簡單來說，在機器啟動(power on)之後的開機流程通常會是:</p>
+<ol class="arabic simple">
+<li>Bootloader 將 kernel image 載入到記憶體之中。</li>
+<li>在 kernel image 前段的 bootstrap code 進行硬體初始化等準備工作，並將內核解壓縮。</li>
+<li>最後呼叫 <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L492">start_kernel()</a>，開始一連串真正屬於 kernel level 的初始化工作。</li>
+</ol>
+<p>start_kernel() 本身是個非常龐大的函式，主要的 OS 資料結構，基礎設施及子系統都由這邊進行初始化，在追蹤 start_kernel() 的過程中能夠看到 OS 的全貌。
+因為如此，所以我覺得想要了解 Linux kernel 的話，start_kernel() 是一個非常好的進入點。</p>
+<p>本篇先不深入 start_kernel() 的細節，先給一個關於核心初始化流程的概觀。
+在本篇最開始的地方有一張 call graph，經由這張圖我們可以概略地了解 start_kernel() 之後的流程：</p>
+<ol class="arabic">
+<li><p class="first">呼叫 setup_arch() 進行架構相關的初始化。</p>
+<p><a class="reference external" href="http://lxr.free-electrons.com/ident?v=4.1;i=setup_arch">setup_arch()</a> 是由各個架構提供，通常是在 arch/xxx/kernel/setup.c 之中</p>
+</li>
+<li><p class="first">設定中斷向量，初始化記憶體管理 (memory management), 排程器 (scheduler), 虛擬檔案系統 (virtual file system), ... 等</p>
+</li>
+<li><p class="first">在 start_kernel() 的最後會呼叫 rest_init()，到此已經完成了 OS 最核心部份的初始化，基本上 OS 已經算可以動了。</p>
+</li>
+<li><p class="first">rest_init() 就字面上的意義是&quot;其餘的初始化工作&quot;，它會呼叫兩次 kernel_thread() 產生另外兩個核心程序 kernel_init 及 kthreadd，最後它會進入 cpu_idle_loop() 之中成為 pid = 0 的 idle process。</p>
+</li>
+<li><p class="first">pid = 1 的 kernel_init 會繼續更高階的初始化，如初始化 driver, 打開 console, 最後執行一連串檔案系統中的 init 之後，執行 sh 程序。</p>
+<ul>
+<li><p class="first">/sbin/init</p>
+</li>
+<li><p class="first">/etc/init</p>
+</li>
+<li><p class="first">/bin/init</p>
+</li>
+<li><p class="first">/bin/sh</p>
+<p>這個 sh 程序 (pid=1) 會是所有使用者程序的父程序。</p>
+</li>
+</ul>
+</li>
+<li><p class="first">pid = 2 的 kthreadd 是一個核心守護線程 (daemon thread)，它是所有其他核心守護線程的父線程，負責處理其他核心線程創建請求。</p>
+</li>
+</ol>
+<p>接下來，讓我們來實際看看程式碼 (kernel version 4.1.15)。為了說明方便，下面的內核程式碼會有些簡化。</p>
+<p>linux/init/main.c : <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L492">start_kernel()</a></p>
+<p>在 bootloader 將 kernel image 載入並解壓縮到記憶體，完成必要的硬體設定，及初始記憶體分頁後，<a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L492">start_kernel()</a> 將會被呼叫，開始進行核心層級的初始化。</p>
+<blockquote>
+<div class="highlight"><pre><span class="n">asmlinkage</span> <span class="n">__visible</span> <span class="kt">void</span> <span class="n">__init</span> <span class="nf">start_kernel</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">char</span> <span class="o">*</span> <span class="n">command_line</span><span class="p">;</span>
+    <span class="k">extern</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param</span> <span class="n">__start___param</span><span class="p">[],</span> <span class="n">__stop___param</span><span class="p">[];</span>
+
+    <span class="p">...</span> <span class="n">init</span> <span class="n">procedures</span><span class="p">,</span> <span class="n">omitted</span> <span class="p">...</span>
+
+    <span class="n">boot_cpu_init</span><span class="p">();</span>
+
+<span class="hll">    <span class="n">setup_arch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">command_line</span><span class="p">);</span>         <span class="c1">// architecture-specific setup</span>
+</span>    <span class="n">setup_command_line</span><span class="p">(</span><span class="n">command_line</span><span class="p">);</span>  <span class="c1">// store the untouched command line</span>
+
+    <span class="n">trap_init</span><span class="p">();</span>  <span class="c1">// architecture-specific, interrupt vector table, handle hardware traps, exceptions and faults.</span>
+<span class="hll">    <span class="n">mm_init</span><span class="p">();</span>    <span class="c1">// memory management</span>
+</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * Set up the scheduler prior starting any interrupts (such as the</span>
+<span class="cm">     * timer interrupt). Full topology setup happens at smp_init()</span>
+<span class="cm">     * time - but meanwhile we still have a functioning scheduler.</span>
+<span class="cm">     */</span>
+<span class="hll">    <span class="n">sched_init</span><span class="p">();</span>
+</span>
+    <span class="n">init_IRQ</span><span class="p">();</span>
+    <span class="n">tick_init</span><span class="p">();</span>
+    <span class="n">init_timers</span><span class="p">();</span>
+
+    <span class="p">...</span> <span class="n">init</span> <span class="n">procedures</span><span class="p">,</span> <span class="n">omitted</span> <span class="p">...</span>
+
+
+    <span class="cm">/*</span>
+<span class="cm">     * HACK ALERT! This is early. We&#39;re enabling the console before</span>
+<span class="cm">     * we&#39;ve done PCI setups etc, and console_init() must be aware of</span>
+<span class="cm">     * this. But we do want output early, in case something goes wrong.</span>
+<span class="cm">     */</span>
+    <span class="n">console_init</span><span class="p">();</span>
+
+    <span class="p">...</span> <span class="n">init</span> <span class="n">procedures</span><span class="p">,</span> <span class="n">omitted</span> <span class="p">...</span>
+
+
+    <span class="n">sched_clock_init</span><span class="p">();</span>
+
+    <span class="p">...</span> <span class="n">init</span> <span class="n">procedures</span><span class="p">,</span> <span class="n">omitted</span> <span class="p">...</span>
+
+
+<span class="hll">    <span class="n">vfs_caches_init</span><span class="p">(</span><span class="n">totalram_pages</span><span class="p">);</span>  <span class="c1">// file system, including kernfs, sysfs, rootfs, mount tree</span>
+</span>
+<span class="hll">    <span class="n">proc_root_init</span><span class="p">();</span>  <span class="c1">// /proc, /proc/fs, /proc/driver, ...</span>
+</span>    <span class="n">nsfs_init</span><span class="p">();</span>
+    <span class="n">cpuset_init</span><span class="p">();</span>
+    <span class="n">cgroup_init</span><span class="p">();</span>
+
+    <span class="p">...</span> <span class="n">init</span> <span class="n">procedures</span><span class="p">,</span> <span class="n">omitted</span> <span class="p">...</span>
+
+
+    <span class="cm">/* Do the rest non-__init&#39;ed, we&#39;re now alive */</span>
+    <span class="n">rest_init</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+<p>到這邊，屬於 OS 最核心的的基礎設施都已經完成初始化，基本上 OS 已經可以開始作用了。接下來在 start_kernel()
+的最後會呼叫 <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L383">rest_init()</a> ，它會產生另一個核心程序 kernel_init，繼續更高階系統的初始化。</p>
+<p>在 rest_init() 中主要進行 4 件工作:</p>
+<ul class="simple">
+<li>創建核心線程 kernel_init</li>
+<li>創建核心線程 kthreadd</li>
+<li>至少執行一次 schedule() 進行排程調度，讓剛剛創建的核心線程能夠開始執行</li>
+<li>進入 cpu_idle_loop() 變成 idle process (pid=0) 處理 idle task</li>
+</ul>
+<blockquote>
+<div class="highlight"><pre><span class="k">static</span> <span class="n">noinline</span> <span class="kt">void</span> <span class="n">__init_refok</span> <span class="nf">rest_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">int</span> <span class="n">pid</span><span class="p">;</span>
+
+    <span class="n">rcu_scheduler_starting</span><span class="p">();</span>
+    <span class="n">smpboot_thread_init</span><span class="p">();</span>
+    <span class="cm">/*</span>
+<span class="cm">     * We need to spawn init first so that it obtains pid 1, however</span>
+<span class="cm">     * the init task will end up wanting to create kthreads, which, if</span>
+<span class="cm">     * we schedule it before we create kthreadd, will OOPS.</span>
+<span class="cm">     */</span>
+<span class="hll">    <span class="n">kernel_thread</span><span class="p">(</span><span class="n">kernel_init</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLONE_FS</span><span class="p">);</span>
+</span>    <span class="n">numa_default_policy</span><span class="p">();</span>
+<span class="hll">    <span class="n">pid</span> <span class="o">=</span> <span class="n">kernel_thread</span><span class="p">(</span><span class="n">kthreadd</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLONE_FS</span> <span class="o">|</span> <span class="n">CLONE_FILES</span><span class="p">);</span>
+</span>    <span class="n">rcu_read_lock</span><span class="p">();</span>
+    <span class="n">kthreadd_task</span> <span class="o">=</span> <span class="n">find_task_by_pid_ns</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">init_pid_ns</span><span class="p">);</span>
+    <span class="n">rcu_read_unlock</span><span class="p">();</span>
+    <span class="n">complete</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthreadd_done</span><span class="p">);</span> <span class="c1">// for synchronization. kernel_init_freeable() will wait for this signal</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * The boot idle thread must execute schedule()</span>
+<span class="cm">     * at least once to get things moving:</span>
+<span class="cm">     */</span>
+    <span class="n">init_idle_bootup_task</span><span class="p">(</span><span class="n">current</span><span class="p">);</span> <span class="c1">// set its scheduling class to idle_sched_class</span>
+    <span class="n">schedule_preempt_disabled</span><span class="p">();</span>    <span class="c1">// this function will call schedule()</span>
+
+    <span class="cm">/* Call into cpu_idle with preempt disabled \*/</span>
+    <span class="n">cpu_startup_entry</span><span class="p">(</span><span class="n">CPUHP_ONLINE</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+<div class="highlight"><pre><span class="cm">/**</span>
+<span class="cm"> * schedule_preempt_disabled - called with preemption disabled</span>
+<span class="cm"> *</span>
+<span class="cm"> * Returns with preemption disabled. Note: preempt_count must be 1</span>
+<span class="cm"> */</span>
+<span class="kt">void</span> <span class="n">__sched</span> <span class="nf">schedule_preempt_disabled</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">sched_preempt_enable_no_resched</span><span class="p">();</span>  <span class="c1">// Enables kernel preemption but do not check for any pending reschedules</span>
+<span class="hll">    <span class="n">schedule</span><span class="p">();</span>
+</span>    <span class="n">preempt_disable</span><span class="p">();</span>  <span class="c1">// Disables kernel preemption by incrementing the preemption counter</span>
+<span class="p">}</span>
+</pre></div>
+<div class="highlight"><pre><span class="kt">void</span> <span class="nf">cpu_startup_entry</span><span class="p">(</span><span class="k">enum</span> <span class="n">cpuhp_state</span> <span class="n">state</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+    <span class="n">arch_cpu_idle_prepare</span><span class="p">();</span>
+    <span class="n">cpu_idle_loop</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="idle-loop-pid-0">
+<h2>idle loop (pid=0)</h2>
+<p>rest_init() 在最後會進入 cpu_idle_loop() 之中成為 pid = 0 的 idle process，到這邊它已經完成系統初始化的任務了。</p>
+<p>idle process 的優先權是最低的，當 CPU 真的沒事做時才會輪到它。在 x86 的架構下，會執行 CPU hlt 指令，在 ARM 架構下則是 wfe 指令 (wait for event)，讓 CPU 進入睡眠。</p>
+<p>kernel/sched/idle.c: <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/sched/idle.c?v=4.1#L207">cpu_idle_loop()</a></p>
+<blockquote>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">void</span> <span class="nf">cpu_idle_loop</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">while</span> <span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+        <span class="cm">/*</span>
+<span class="cm">         * If the arch has a polling bit, we maintain an invariant:</span>
+<span class="cm">         *</span>
+<span class="cm">         * Our polling bit is clear if we&#39;re not scheduled (i.e. if</span>
+<span class="cm">         * rq-&gt;curr != rq-&gt;idle).  This means that, if rq-&gt;idle has</span>
+<span class="cm">         * the polling bit set, then setting need_resched is</span>
+<span class="cm">         * guaranteed to cause the cpu to reschedule.</span>
+<span class="cm">         */</span>
+
+        <span class="n">__current_set_polling</span><span class="p">();</span>
+        <span class="n">tick_nohz_idle_enter</span><span class="p">();</span>   <span class="c1">// stop the idle tick from the idle task</span>
+
+        <span class="k">while</span> <span class="p">(</span><span class="o">!</span><span class="n">need_resched</span><span class="p">())</span> <span class="p">{</span>
+            <span class="n">check_pgt_cache</span><span class="p">();</span>
+            <span class="n">rmb</span><span class="p">();</span>      <span class="c1">// read memory barrier.</span>
+                        <span class="c1">// It ensures that no loads are reordered across the rmb() call.</span>
+                        <span class="c1">// no loads prior to the call will be reordered to after the call</span>
+                        <span class="c1">// and no loads after the call will be reordered to before the call.</span>
+                        <span class="c1">// http://www.makelinux.net/books/lkd2/ch09lev1sec10</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">cpu_is_offline</span><span class="p">(</span><span class="n">smp_processor_id</span><span class="p">()))</span> <span class="p">{</span>
+                <span class="n">rcu_cpu_notify</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">CPU_DYING_IDLE</span><span class="p">,</span>
+                           <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)(</span><span class="kt">long</span><span class="p">)</span><span class="n">smp_processor_id</span><span class="p">());</span>
+                <span class="n">smp_mb</span><span class="p">();</span> <span class="cm">/* all activity before dead. */</span>
+                <span class="n">this_cpu_write</span><span class="p">(</span><span class="n">cpu_dead_idle</span><span class="p">,</span> <span class="nb">true</span><span class="p">);</span>
+                <span class="n">arch_cpu_idle_dead</span><span class="p">();</span>
+            <span class="p">}</span>
+
+            <span class="n">local_irq_disable</span><span class="p">();</span>
+            <span class="n">arch_cpu_idle_enter</span><span class="p">();</span>
+
+            <span class="cm">/*</span>
+<span class="cm">             * In poll mode we reenable interrupts and spin.</span>
+<span class="cm">             *</span>
+<span class="cm">             * Also if we detected in the wakeup from idle</span>
+<span class="cm">             * path that the tick broadcast device expired</span>
+<span class="cm">             * for us, we don&#39;t want to go deep idle as we</span>
+<span class="cm">             * know that the IPI is going to arrive right</span>
+<span class="cm">             * away</span>
+<span class="cm">             */</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">cpu_idle_force_poll</span> <span class="o">||</span> <span class="n">tick_check_broadcast_expired</span><span class="p">())</span>
+                <span class="n">cpu_idle_poll</span><span class="p">();</span>
+            <span class="k">else</span>
+                <span class="n">cpuidle_idle_call</span><span class="p">();</span>
+
+            <span class="n">arch_cpu_idle_exit</span><span class="p">();</span>
+        <span class="p">}</span>
+
+        <span class="cm">/*</span>
+<span class="cm">         * Since we fell out of the loop above, we know</span>
+<span class="cm">         * TIF_NEED_RESCHED must be set, propagate it into</span>
+<span class="cm">         * PREEMPT_NEED_RESCHED.</span>
+<span class="cm">         *</span>
+<span class="cm">         * This is required because for polling idle loops we will</span>
+<span class="cm">         * not have had an IPI to fold the state for us.</span>
+<span class="cm">         */</span>
+        <span class="n">preempt_set_need_resched</span><span class="p">();</span>
+        <span class="n">tick_nohz_idle_exit</span><span class="p">();</span>   <span class="c1">// restart the idle tick from the idle task</span>
+        <span class="n">__current_clr_polling</span><span class="p">();</span>
+
+        <span class="cm">/*</span>
+<span class="cm">         * We promise to call sched_ttwu_pending and reschedule</span>
+<span class="cm">         * if need_resched is set while polling is set.  That</span>
+<span class="cm">         * means that clearing polling needs to be visible</span>
+<span class="cm">         * before doing these things.</span>
+<span class="cm">         */</span>
+        <span class="n">smp_mb__after_atomic</span><span class="p">();</span>
+
+        <span class="n">sched_ttwu_pending</span><span class="p">();</span>
+<span class="hll">        <span class="n">schedule_preempt_disabled</span><span class="p">();</span>
+</span>    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+<div class="highlight"><pre><span class="cm">/**</span>
+<span class="cm"> * schedule_preempt_disabled - called with preemption disabled</span>
+<span class="cm"> *</span>
+<span class="cm"> * Returns with preemption disabled. Note: preempt_count must be 1</span>
+<span class="cm"> */</span>
+<span class="kt">void</span> <span class="n">__sched</span> <span class="nf">schedule_preempt_disabled</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">sched_preempt_enable_no_resched</span><span class="p">();</span>  <span class="c1">// Enables kernel preemption but do not check for any pending reschedules</span>
+<span class="hll">    <span class="n">schedule</span><span class="p">();</span>
+</span>    <span class="n">preempt_disable</span><span class="p">();</span>  <span class="c1">// Disables kernel preemption by incrementing the preemption counter</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="kernel-init-pid-1">
+<h2>kernel_init (pid=1)</h2>
+<p>kernel_init 會繼續接手系統層級的初始化工作。一個系統除了 CPU 及記憶體外等核心硬體外，還有許多 I/O 週邊需要 OS 的支援，而除了硬體之外，還有像檔案系統，網路協議處理等屬於軟體中間層的部份需要 OS 的支援。 這些部份的初始化由 kernel_init() 來完成。</p>
+<p>init/main.c : <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L927">kernel_init()</a></p>
+<blockquote>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">int</span> <span class="n">__ref</span> <span class="nf">kernel_init</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">unused</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">int</span> <span class="n">ret</span><span class="p">;</span>
+
+<span class="hll">    <span class="n">kernel_init_freeable</span><span class="p">();</span>    <span class="c1">// init drivers, modules, and open /dev/console</span>
+</span>    <span class="cm">/* need to finish all async __init code before freeing the memory */</span>
+    <span class="n">async_synchronize_full</span><span class="p">();</span>  <span class="c1">// waits until all asynchronous function calls have been done</span>
+    <span class="n">free_initmem</span><span class="p">();</span>            <span class="c1">// free .init section</span>
+    <span class="n">mark_rodata_ro</span><span class="p">();</span>
+    <span class="n">system_state</span> <span class="o">=</span> <span class="n">SYSTEM_RUNNING</span><span class="p">;</span>
+    <span class="n">numa_default_policy</span><span class="p">();</span>
+
+    <span class="n">flush_delayed_fput</span><span class="p">();</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">ramdisk_execute_command</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">run_init_process</span><span class="p">(</span><span class="n">ramdisk_execute_command</span><span class="p">);</span>
+            <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">ret</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="n">pr_err</span><span class="p">(</span><span class="s">&quot;Failed to execute %s (error %d)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+                   <span class="n">ramdisk_execute_command</span><span class="p">,</span> <span class="n">ret</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * We try each of these until one succeeds.</span>
+<span class="cm">     *</span>
+<span class="cm">     * The Bourne shell can be used instead of init if we are</span>
+<span class="cm">     * trying to recover a really broken machine.</span>
+<span class="cm">     */</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">execute_command</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">run_init_process</span><span class="p">(</span><span class="n">execute_command</span><span class="p">);</span>
+            <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">ret</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="cp">#ifndef CONFIG_INIT_FALLBACK</span>
+            <span class="n">panic</span><span class="p">(</span><span class="s">&quot;Requested init %s failed (error %d).&quot;</span><span class="p">,</span>
+                  <span class="n">execute_command</span><span class="p">,</span> <span class="n">ret</span><span class="p">);</span>
+<span class="cp">#else</span>
+            <span class="n">pr_err</span><span class="p">(</span><span class="s">&quot;Failed to execute %s (error %d).  Attempting defaults...</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+                   <span class="n">execute_command</span><span class="p">,</span> <span class="n">ret</span><span class="p">);</span>
+<span class="cp">#endif</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">try_to_run_init_process</span><span class="p">(</span><span class="s">&quot;/sbin/init&quot;</span><span class="p">)</span> <span class="o">||</span>
+        <span class="o">!</span><span class="n">try_to_run_init_process</span><span class="p">(</span><span class="s">&quot;/etc/init&quot;</span><span class="p">)</span> <span class="o">||</span>
+        <span class="o">!</span><span class="n">try_to_run_init_process</span><span class="p">(</span><span class="s">&quot;/bin/init&quot;</span><span class="p">)</span> <span class="o">||</span>
+        <span class="o">!</span><span class="n">try_to_run_init_process</span><span class="p">(</span><span class="s">&quot;/bin/sh&quot;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+    <span class="n">panic</span><span class="p">(</span><span class="s">&quot;No working init found.  Try passing init= option to kernel. &quot;</span>
+          <span class="s">&quot;See Linux Documentation/init.txt for guidance.&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+<p>init/main.c: <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L972">kernel_init_freeable()</a></p>
+<p>freeable 就字面上的意思是可以被卸載的，這個函式主要是將一些系統週邊及軟體中間層掛進 OS 及初始化。
+kernel_init_freeable() 所處理的初始化工作非常廣，如下面的程式碼所表示，它包含初始化 device, driver, rootfs, 掛載 /dev, /sys 等虛擬檔案系統目錄，開啟 /dev/console 做為訊息輸出等。
+它的大部份的工作都是由 do_basic_setup() 所完成，要深入它需要比較多的時間，在這邊我們先回到比較高階的觀點來看整體初始化的流程。</p>
+<blockquote>
+<div class="highlight"><pre><span class="k">static</span> <span class="n">noinline</span> <span class="kt">void</span> <span class="n">__init</span> <span class="nf">kernel_init_freeable</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="cm">/*</span>
+<span class="cm">     * Wait until kthreadd is all set-up.</span>
+<span class="cm">     */</span>
+    <span class="n">wait_for_completion</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthreadd_done</span><span class="p">);</span>
+
+    <span class="cm">/* Now the scheduler is fully set up and can do blocking allocations */</span>
+    <span class="n">gfp_allowed_mask</span> <span class="o">=</span> <span class="n">__GFP_BITS_MASK</span><span class="p">;</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * init can allocate pages on any node</span>
+<span class="cm">     */</span>
+    <span class="n">set_mems_allowed</span><span class="p">(</span><span class="n">node_states</span><span class="p">[</span><span class="n">N_MEMORY</span><span class="p">]);</span>
+    <span class="cm">/*</span>
+<span class="cm">     * init can run on any cpu.</span>
+<span class="cm">     */</span>
+    <span class="n">set_cpus_allowed_ptr</span><span class="p">(</span><span class="n">current</span><span class="p">,</span> <span class="n">cpu_all_mask</span><span class="p">);</span>
+
+    <span class="n">cad_pid</span> <span class="o">=</span> <span class="n">task_pid</span><span class="p">(</span><span class="n">current</span><span class="p">);</span>
+
+    <span class="n">smp_prepare_cpus</span><span class="p">(</span><span class="n">setup_max_cpus</span><span class="p">);</span>
+
+    <span class="n">do_pre_smp_initcalls</span><span class="p">();</span>
+    <span class="n">lockup_detector_init</span><span class="p">();</span>
+
+    <span class="n">smp_init</span><span class="p">();</span>
+    <span class="n">sched_init_smp</span><span class="p">();</span>
+
+<span class="hll">    <span class="n">do_basic_setup</span><span class="p">();</span>
+</span>
+    <span class="cm">/* Open the /dev/console on the rootfs, this should never fail */</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">sys_open</span><span class="p">((</span><span class="k">const</span> <span class="kt">char</span> <span class="n">__user</span> <span class="o">*</span><span class="p">)</span> <span class="s">&quot;/dev/console&quot;</span><span class="p">,</span> <span class="n">O_RDWR</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">pr_err</span><span class="p">(</span><span class="s">&quot;Warning: unable to open an initial console.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+
+    <span class="p">(</span><span class="kt">void</span><span class="p">)</span> <span class="n">sys_dup</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+    <span class="p">(</span><span class="kt">void</span><span class="p">)</span> <span class="n">sys_dup</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+    <span class="cm">/*</span>
+<span class="cm">     * check if there is an early userspace init.  If yes, let it do all</span>
+<span class="cm">     * the work</span>
+<span class="cm">     */</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">ramdisk_execute_command</span><span class="p">)</span>
+        <span class="n">ramdisk_execute_command</span> <span class="o">=</span> <span class="s">&quot;/init&quot;</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">sys_access</span><span class="p">((</span><span class="k">const</span> <span class="kt">char</span> <span class="n">__user</span> <span class="o">*</span><span class="p">)</span> <span class="n">ramdisk_execute_command</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ramdisk_execute_command</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="n">prepare_namespace</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * Ok, we have completed the initial bootup, and</span>
+<span class="cm">     * we&#39;re essentially up and running. Get rid of the</span>
+<span class="cm">     * initmem segments and start the user-mode stuff..</span>
+<span class="cm">     *</span>
+<span class="cm">     * rootfs is available now, try loading the public keys</span>
+<span class="cm">     * and default modules</span>
+<span class="cm">     */</span>
+
+    <span class="n">integrity_load_keys</span><span class="p">();</span>
+    <span class="n">load_default_modules</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+<p>init/main.c: <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L864">do_basic_setup()</a></p>
+<p>事實上，大部份的初始化工作都在這個函式內完成，do_basic_setup() 絕不簡單。</p>
+<blockquote>
+<div class="highlight"><pre><span class="cm">/*</span>
+<span class="cm"> * Ok, the machine is now initialized. None of the devices</span>
+<span class="cm"> * have been touched yet, but the CPU subsystem is up and</span>
+<span class="cm"> * running, and memory and process management works.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Now we can finally start doing some real work..</span>
+<span class="cm"> */</span>
+<span class="k">static</span> <span class="kt">void</span> <span class="n">__init</span> <span class="nf">do_basic_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">cpuset_init_smp</span><span class="p">();</span>
+    <span class="n">usermodehelper_init</span><span class="p">();</span>
+    <span class="n">shmem_init</span><span class="p">();</span>
+    <span class="n">driver_init</span><span class="p">();</span>           <span class="c1">// init driver model. (kobject, kset)</span>
+    <span class="n">init_irq_proc</span><span class="p">();</span>
+    <span class="n">do_ctors</span><span class="p">();</span>              <span class="c1">// call constructor functions in .ctors section</span>
+    <span class="n">usermodehelper_enable</span><span class="p">();</span>
+    <span class="n">do_initcalls</span><span class="p">();</span>          <span class="c1">// call init functions in .initcall[0~9].init sections</span>
+    <span class="n">random_int_secret_init</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+<div class="highlight"><pre><span class="cm">/**</span>
+<span class="cm"> * driver_init - initialize driver model.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Call the driver model init functions to initialize their</span>
+<span class="cm"> * subsystems. Called early from init/main.c.</span>
+<span class="cm"> */</span>
+<span class="kt">void</span> <span class="n">__init</span> <span class="nf">driver_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="cm">/* These are the core pieces */</span>
+    <span class="n">devtmpfs_init</span><span class="p">();</span>  <span class="c1">// mount root node: &quot;/&quot;</span>
+    <span class="n">devices_init</span><span class="p">();</span>
+    <span class="n">buses_init</span><span class="p">();</span>
+    <span class="n">classes_init</span><span class="p">();</span>
+    <span class="n">firmware_init</span><span class="p">();</span>
+    <span class="n">hypervisor_init</span><span class="p">();</span>
+
+    <span class="cm">/* These are also core pieces, but must come after the</span>
+<span class="cm">     * core core pieces.</span>
+<span class="cm">     */</span>
+    <span class="n">platform_bus_init</span><span class="p">();</span>
+    <span class="n">cpu_dev_init</span><span class="p">();</span>
+    <span class="n">memory_dev_init</span><span class="p">();</span>
+    <span class="n">container_dev_init</span><span class="p">();</span>
+    <span class="n">of_core_init</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="kthreadd-pid-2">
+<h2>kthreadd (pid=2)</h2>
+<p>kernel/kthread.c: <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/kthread.c?v=4.1#L483">kthreadd()</a></p>
+<ul class="simple">
+<li>kthreadd 是一個核心守護線程 (daemon thread)，它是所有其他核心線程的父線程。它負責處理經由 <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/kthread.c?v=4.1#L245">kthread_create_on_node()</a> 記錄在 <code>kthread_create_list</code> 的核心線程創建請求。</li>
+<li>當 <code>kthread_create_list</code> 為空時，kthreadd 會將自已的狀態設為 <code>TASK_INTERRUPTIBLE</code>，並讓出 CPU。</li>
+</ul>
+<!--  -->
+<blockquote>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">kthread_create_info</span>
+<span class="p">{</span>
+    <span class="cm">/* Information passed to kthread() from kthreadd. */</span>
+    <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">threadfn</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span><span class="n">data</span><span class="p">);</span>
+    <span class="kt">void</span> <span class="o">*</span><span class="n">data</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">node</span><span class="p">;</span>
+
+    <span class="cm">/* Result passed back to kthread_create() from kthreadd. */</span>
+    <span class="k">struct</span> <span class="n">task_struct</span> <span class="o">*</span><span class="n">result</span><span class="p">;</span>
+    <span class="k">struct</span> <span class="n">completion</span> <span class="o">*</span><span class="n">done</span><span class="p">;</span>
+
+    <span class="k">struct</span> <span class="n">list_head</span> <span class="n">list</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="kt">int</span> <span class="nf">kthreadd</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">unused</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">struct</span> <span class="n">task_struct</span> <span class="o">*</span><span class="n">tsk</span> <span class="o">=</span> <span class="n">current</span><span class="p">;</span>
+
+    <span class="cm">/* Setup a clean context for our children to inherit. */</span>
+    <span class="n">set_task_comm</span><span class="p">(</span><span class="n">tsk</span><span class="p">,</span> <span class="s">&quot;kthreadd&quot;</span><span class="p">);</span>
+    <span class="n">ignore_signals</span><span class="p">(</span><span class="n">tsk</span><span class="p">);</span>
+    <span class="n">set_cpus_allowed_ptr</span><span class="p">(</span><span class="n">tsk</span><span class="p">,</span> <span class="n">cpu_all_mask</span><span class="p">);</span>
+    <span class="n">set_mems_allowed</span><span class="p">(</span><span class="n">node_states</span><span class="p">[</span><span class="n">N_MEMORY</span><span class="p">]);</span>
+
+    <span class="n">current</span><span class="o">-&gt;</span><span class="n">flags</span> <span class="o">|=</span> <span class="n">PF_NOFREEZE</span><span class="p">;</span>
+
+    <span class="k">for</span> <span class="p">(;;)</span> <span class="p">{</span>
+        <span class="n">set_current_state</span><span class="p">(</span><span class="n">TASK_INTERRUPTIBLE</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">list_empty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_list</span><span class="p">))</span>  <span class="c1">// if no kthread create request</span>
+<span class="hll">            <span class="n">schedule</span><span class="p">();</span>                        <span class="c1">// yield CPU</span>
+</span>        <span class="n">__set_current_state</span><span class="p">(</span><span class="n">TASK_RUNNING</span><span class="p">);</span>
+
+        <span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_lock</span><span class="p">);</span>
+        <span class="k">while</span> <span class="p">(</span><span class="o">!</span><span class="n">list_empty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_list</span><span class="p">))</span> <span class="p">{</span>  <span class="c1">// handle all kthread create requests</span>
+            <span class="k">struct</span> <span class="n">kthread_create_info</span> <span class="o">*</span><span class="n">create</span><span class="p">;</span>
+
+            <span class="n">create</span> <span class="o">=</span> <span class="n">list_entry</span><span class="p">(</span><span class="n">kthread_create_list</span><span class="p">.</span><span class="n">next</span><span class="p">,</span>
+                        <span class="k">struct</span> <span class="n">kthread_create_info</span><span class="p">,</span> <span class="n">list</span><span class="p">);</span>
+            <span class="n">list_del_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">create</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">);</span>   <span class="c1">// remove the entry from list</span>
+            <span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_lock</span><span class="p">);</span>
+
+<span class="hll">            <span class="n">create_kthread</span><span class="p">(</span><span class="n">create</span><span class="p">);</span>
+</span>
+            <span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_lock</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kthread_create_lock</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="id3">
+<h2>小結</h2>
+<p>本篇介紹 Linux kernel 在 start_kernel() 之後大致的流程。
+在系統開機之後基本上就是一連串的初始化流程，由低階到高階，而高階的部份常常會根據各個系統不同的應用情境進行調整。</p>
+<p>要了解一個系統，我喜歡由巨觀的程式流程入手，然後再深入了解微觀的實作細節，對我來說，這是比較好的順序。
+在看實作的細節時，我會想先知道我目前處在整個大架構的什麼位置，資料的上下游關係是什麼，這樣可以讓我比較能理解程式是怎樣運作的，以及實作時的考量。
+因此本篇先講核心啟動的大架構流程，接下來將會對 Linux 系統初始化流程的各個部份有更深入的探討。</p>
+</div>
+<div class="section" id="reference">
+<h2>Reference</h2>
+<ul class="simple">
+<li><a class="reference external" href="http://www.ibm.com/developerworks/library/l-linuxboot/index.html">IBM developerWorks: Inside the Linux boot process</a></li>
+<li><a class="reference external" href="http://duartes.org/gustavo/blog/post/kernel-boot-process/">Gustavo Duarte: The Kernel Boot Process</a></li>
+<li><a class="reference external" href="http://duartes.org/gustavo/blog/post/what-does-an-idle-cpu-do/">Gustavo Duarte: What Does an Idle CPU Do?</a></li>
+</ul>
+<p>Kernel doc:</p>
+<ul class="simple">
+<li>x86 booting: <a class="reference external" href="https://www.kernel.org/doc/Documentation/x86/boot.txt">https://www.kernel.org/doc/Documentation/x86/boot.txt</a></li>
+<li>arm booting: <a class="reference external" href="https://www.kernel.org/doc/Documentation/arm/Booting">https://www.kernel.org/doc/Documentation/arm/Booting</a></li>
+</ul>
+</div>
+</div>
+    <footer>
+<p class="meta">
+  <span class="byline author vcard">
+    Posted by <span class="fn">
+        Daniel Lin
+    </span>
+  </span>
+<time datetime="2016-01-12T00:00:00+08:00" pubdate>2016-01-12, Tue</time>  <span class="categories">
+    <a class='category' href='https://danielmaker.github.io/blog/category/linux.html'>Linux</a>
+  </span>
+  <span class="categories">
+    <a class="category" href="https://danielmaker.github.io/blog/tag/linux-kernel.html">Linux kernel</a>  </span>
+</p><div class="sharing">
+</div>    </footer>
+  </article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript></div>
+  </section>
+</div>
+<aside class="sidebar">
+  <section>
+    <h1>Recent Posts</h1>
+    <ul id="recent_posts">
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/start_kernel.html">核心的進入點: start_kernel()</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/linux_kernel_beginning.html">Linux Kernel 探險地圖</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.html">May The Source Be With You</a>
+      </li>
+    </ul>
+  </section>
+  <section>
+
+    <h1>Categories</h1>
+    <ul id="recent_posts">
+        <li><a href="https://danielmaker.github.io/blog/category/about.html">About</a></li>
+        <li><a href="https://danielmaker.github.io/blog/category/linux.html">Linux</a></li>
+    </ul>
+  </section>
+
+  <section>
+  <h1>Tags</h1>
+    <a href="https://danielmaker.github.io/blog/tag/linux-kernel.html">Linux kernel</a>  </section>
+
+
+
+
+  <!-- Creative Commons 授權條款 -->
+  <a target="_blank" class="svg" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW" style="display: inline-block;"
+     title="姓名標示-非商業性-相同方式分享 4.0"><object alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" data="https://danielmaker.github.io/blog/theme/images/by-nc-sa.svg" type="image/svg+xml" style="pointer-events: none;">/theme/images/by-nc-sa.svg</object></a>
+  <!-- Creative Commons 授權條款 -->
+</aside>    </div>
+  </div>
+  <footer role="contentinfo"><p>
+
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0"><img alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" src="https://danielmaker.github.io/blog/theme/images/cc-by-nc-sa-88x31.png" border="0" /></a>
+
+    Copyright &copy;  2015&ndash;2016  Daniel Lin &mdash;
+
+  <!-- Creative Commons 授權條款 -->
+  本著作係採用
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0">Creative Commons BY-NC-SA 條款</a> 授權.
+  <!-- Creative Commons 授權條款 -->
+
+  <span class="credit">Powered by <a href="http://getpelican.com">Pelican</a></span>
+</p></footer>
+  <script src="https://danielmaker.github.io/blog/theme/js/modernizr-2.0.js"></script>
+  <script src="https://danielmaker.github.io/blog/theme/js/ender.js"></script>
+  <script src="https://danielmaker.github.io/blog/theme/js/octopress.js" type="text/javascript"></script>
+    <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-71811903-1', 'auto');
+
+    ga('send', 'pageview');
+    </script>
+  <script type="text/javascript">
+    var disqus_shortname = 'danielmaker';
+    var disqus_identifier = '/linux/start_kernel.html';
+    var disqus_url = 'https://danielmaker.github.io/blog/linux/start_kernel.html';
+    var disqus_title = '核心的進入點: start_kernel()';
+    (function() {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = "//" + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+  </script>
+</body>
+</html>
