@@ -111,17 +111,13 @@
 </li>
 <li><p class="first">rest_init() 就字面上的意義是&quot;其餘的初始化工作&quot;，它會呼叫兩次 kernel_thread() 產生另外兩個核心程序 kernel_init 及 kthreadd，最後它會進入 cpu_idle_loop() 之中成為 pid = 0 的 idle process。</p>
 </li>
-<li><p class="first">pid = 1 的 kernel_init 會繼續更高階的初始化，如初始化 driver, 打開 console, 最後執行一連串檔案系統中的 init 之後，執行 sh 程序。</p>
-<ul>
-<li><p class="first">/sbin/init</p>
-</li>
-<li><p class="first">/etc/init</p>
-</li>
-<li><p class="first">/bin/init</p>
-</li>
-<li><p class="first">/bin/sh</p>
-<p>這個 sh 程序 (pid=1) 會是所有使用者程序的父程序。</p>
-</li>
+<li><p class="first">pid = 1 的 kernel_init 會繼續更高階的初始化，如初始化 driver, 打開 console, 最後根據不同的系統配置，
+執行對應的初始化腳本 (可能是 /linuxrc 或是 /init)，或者是下列任一個預設的 init 程序，完成整個系統的初始化。</p>
+<ul class="simple">
+<li>/sbin/init</li>
+<li>/etc/init</li>
+<li>/bin/init</li>
+<li>/bin/sh (最後的這個 sh 程序是當系統出問題時作為系統修復使用)</li>
 </ul>
 </li>
 <li><p class="first">pid = 2 的 kthreadd 是一個核心守護線程 (daemon thread)，它是所有其他核心守護線程的父線程，負責處理其他核心線程創建請求。</p>
@@ -361,8 +357,8 @@
 <span class="hll">    <span class="n">kernel_init_freeable</span><span class="p">();</span>    <span class="c1">// init drivers, modules, and open /dev/console</span>
 </span>    <span class="cm">/* need to finish all async __init code before freeing the memory */</span>
     <span class="n">async_synchronize_full</span><span class="p">();</span>  <span class="c1">// waits until all asynchronous function calls have been done</span>
-    <span class="n">free_initmem</span><span class="p">();</span>            <span class="c1">// free .init section</span>
-    <span class="n">mark_rodata_ro</span><span class="p">();</span>
+    <span class="n">free_initmem</span><span class="p">();</span>            <span class="c1">// free .init section from memory</span>
+    <span class="n">mark_rodata_ro</span><span class="p">();</span>          <span class="c1">// mark rodata read-only</span>
     <span class="n">system_state</span> <span class="o">=</span> <span class="n">SYSTEM_RUNNING</span><span class="p">;</span>
     <span class="n">numa_default_policy</span><span class="p">();</span>
 
