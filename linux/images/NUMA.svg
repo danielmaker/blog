@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="15cm" height="7cm" viewBox="306 207 283 129" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="405" y1="252.388" x2="404.75" y2="331"/>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="465" y1="252.388" x2="465.254" y2="329.314"/>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="525" y1="252.388" x2="525.504" y2="329.914"/>
+  <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="345" y1="252.388" x2="344.75" y2="330.5"/>
+  <g>
+    <rect style="fill: #ffffff" x="320" y="208.1" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="320" y="208.1" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="345" y="227">
+      <tspan x="345" y="227">CPU0</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="320" y="238.1" width="50" height="14.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="320" y="238.1" width="50" height="14.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="345" y="248">
+      <tspan x="345" y="248">cache</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="440" y="208.1" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="440" y="208.1" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="465" y="227">
+      <tspan x="465" y="227">CPU2</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="440" y="238.1" width="50" height="14.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="440" y="238.1" width="50" height="14.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="465" y="248">
+      <tspan x="465" y="248">cache</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="500" y="208.1" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="500" y="208.1" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="525" y="227">
+      <tspan x="525" y="227">CPU3</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="500" y="238.1" width="50" height="14.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="500" y="238.1" width="50" height="14.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="525" y="248">
+      <tspan x="525" y="248">cache</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="320" y="270" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="320" y="270" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="345" y="288.9">
+      <tspan x="345" y="288.9">Memory</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="380" y="270" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="380" y="270" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="405" y="288.9">
+      <tspan x="405" y="288.9">Memory</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="440" y="270" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="440" y="270" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="465" y="288.9">
+      <tspan x="465" y="288.9">Memory</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="500" y="270" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="500" y="270" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="525" y="288.9">
+      <tspan x="525" y="288.9">Memory</tspan>
+    </text>
+  </g>
+  <line style="fill: none; fill-opacity:0; stroke-width: 6; stroke: #000000" x1="310" y1="330" x2="560" y2="330"/>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="565.5" y="332.5">
+    <tspan x="565.5" y="332.5">Bus</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="380" y="207.6" width="50" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="380" y="207.6" width="50" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="405" y="226.5">
+      <tspan x="405" y="226.5">CPU1</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="380" y="237.6" width="50" height="14.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="380" y="237.6" width="50" height="14.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="405" y="247.5">
+      <tspan x="405" y="247.5">cache</tspan>
+    </text>
+  </g>
+</svg>

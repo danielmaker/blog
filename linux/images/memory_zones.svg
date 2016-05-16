@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="16cm" height="10cm" viewBox="489 311 302 181" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+    <rect style="fill: #ffffff" x="490" y="320" width="110.8" height="70"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="490" y="320" width="110.8" height="70"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="545.4" y="358.406">
+      <tspan x="545.4" y="358.406">ZONE_HIGH</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="490" y="390" width="110.8" height="60"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="490" y="390" width="110.8" height="60"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="545.4" y="423.406">
+      <tspan x="545.4" y="423.406">ZONE_NORMAL</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="490" y="447.711" width="110.8" height="32.2889"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="490" y="447.711" width="110.8" height="32.2889"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="545.4" y="467.261">
+      <tspan x="545.4" y="467.261">ZONE_DMA</tspan>
+    </text>
+  </g>
+  <text font-size="12.7998" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="520" y="480">
+    <tspan x="520" y="480"></tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:700" x="490" y="490">
+    <tspan x="490" y="490">Physical Address Space</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="604" y="320">
+    <tspan x="604" y="320">4GB</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="604" y="390">
+    <tspan x="604" y="390">896MB</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="604" y="448">
+    <tspan x="604" y="448">16MB</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="604" y="480">
+    <tspan x="604" y="480">0</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="680" y="360" width="110.8" height="120"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="680" y="360" width="110.8" height="120"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="735.4" y="423.406">
+      <tspan x="735.4" y="423.406">USER SPACE</tspan>
+    </text>
+  </g>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:700" x="690" y="490">
+    <tspan x="690" y="490">Virtual Address Space</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="680" y="320" width="110.8" height="40"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #000000" x="680" y="320" width="110.8" height="40"/>
+    <text font-size="9.03111" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="735.4" y="343.406">
+      <tspan x="735.4" y="343.406">KERNEL SPACE</tspan>
+    </text>
+  </g>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="660" y="320">
+    <tspan x="660" y="320">4GB</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="660" y="360">
+    <tspan x="660" y="360">3GB</tspan>
+  </text>
+  <text font-size="9.03111" style="fill: #000000;text-anchor:start;font-family:Arial;font-style:normal;font-weight:normal" x="672" y="480">
+    <tspan x="672" y="480">0</tspan>
+  </text>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 1; stroke-dasharray: 4; stroke: #bfbfbf" x1="600.8" y1="480" x2="678.768" y2="361.866"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #bfbfbf" points="678.049,372.033 679.384,360.933 669.703,366.525 "/>
+  </g>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 1; stroke-dasharray: 4; stroke: #bfbfbf" x1="602" y1="378" x2="678.206" y2="321.334"/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 1; stroke: #bfbfbf" points="674.062,330.646 679.103,320.667 668.095,322.622 "/>
+  </g>
+</svg>
