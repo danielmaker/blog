@@ -1,5 +1,566 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="https://danielmaker.github.io/blog/" rel="alternate"></link><link href="https://danielmaker.github.io/blog/feeds/linux.atom.xml" rel="self"></link><id>https://danielmaker.github.io/blog/</id><updated>2016-05-16T00:00:00+08:00</updated><entry><title>深入淺出 start_kernel()</title><link href="https://danielmaker.github.io/blog/linux/inside_start_kernel.html" rel="alternate"></link><updated>2016-05-16T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-05-16:blog/linux/inside_start_kernel.html</id><summary type="html">&lt;p&gt;當 bootloader 載入核心映像檔(zImage, or bzImage) 之後，在核心映像檔最開頭的 bootstrap code 會負責關閉中斷，初始化記憶體設定等硬體初始化工作，最後解壓縮內核。
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="https://danielmaker.github.io/blog/" rel="alternate"></link><link href="https://danielmaker.github.io/blog/feeds/linux.atom.xml" rel="self"></link><id>https://danielmaker.github.io/blog/</id><updated>2016-08-13T00:00:00+08:00</updated><entry><title>核心參數解析</title><link href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html" rel="alternate"></link><updated>2016-08-13T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-08-13:blog/linux/kernel_parameter_parsing.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
+&lt;style type="text/css"&gt;
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+    .diagram {line-height: 1;}
+&lt;/style&gt;&lt;!-- ............................................................................. --&gt;
+&lt;p&gt;Linux 核心啟動時會解析由 bootloader 傳來的參數，來設定核心運作時的行為。&lt;/p&gt;
+&lt;p&gt;傳給核心的參數是以空格分隔的字串，通常的型式如下:&lt;/p&gt;
+&lt;blockquote&gt;
+param[=value_1][,value_2]...[,value_10]&lt;/blockquote&gt;
+&lt;p&gt;&amp;quot;param&amp;quot; 是關鍵字，後面跟著設定值，以逗號分隔。一個關鍵字後面最多可以有 10 個值，但是可以透過再次使用同一關鍵字的方式，傳遞超過 10 個以上的參數。&lt;/p&gt;
+&lt;p&gt;舉例來說，bootloader 可以透過 &amp;quot;init=...&amp;quot; 指定系統初始化的程序；或是透過 &amp;quot;root=...&amp;quot;
+指定 root filesystem device，如: &amp;quot;root=/dev/hda3&amp;quot;。&lt;/p&gt;
+&lt;p&gt;這個由 bootloader 傳給核心的參數字串也可以包含傳給 init 程序的參數，核心只會解析到 &amp;quot;--&amp;quot;
+之前的字串，在 &amp;quot;--&amp;quot; 之後的字串會被當成傳給 init 程序的參數。&lt;/p&gt;
+&lt;p&gt;詳細的核心參數說明，請參考下面兩份文件:&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://man7.org/linux/man-pages/man7/bootparam.7.html"&gt;http://man7.org/linux/man-pages/man7/bootparam.7.html&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/kernel-parameters.txt"&gt;https://www.kernel.org/doc/Documentation/kernel-parameters.txt&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Linux 核心跟據不同的架構對 bootloader 有不同的要求。以 x86 架構來說，核心會需要 bootloader 將
+&lt;a class="reference external" href="http://lxr.free-electrons.com/source/arch/x86/include/uapi/asm/bootparam.h?v=4.1#L113"&gt;struct boot_params&lt;/a&gt; 的資料準備好，然後在核心啟動時傳給核心。核心參數字串就是包含在其中的
+&lt;a class="reference external" href="http://lxr.free-electrons.com/source/arch/x86/include/uapi/asm/bootparam.h?v=4.1#L48"&gt;struct setup_header&lt;/a&gt; 結構內的 cmd_line_ptr。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;setup_header&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;__u8&lt;/span&gt;    &lt;span class="n"&gt;setup_sects&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;__u16&lt;/span&gt;   &lt;span class="n"&gt;root_flags&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;__u32&lt;/span&gt;   &lt;span class="n"&gt;syssize&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;__u16&lt;/span&gt;   &lt;span class="n"&gt;ram_size&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+&lt;span class="hll"&gt;    &lt;span class="n"&gt;__u32&lt;/span&gt;   &lt;span class="n"&gt;cmd_line_ptr&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;/span&gt;    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+    &lt;span class="n"&gt;__u32&lt;/span&gt;   &lt;span class="n"&gt;cmdline_size&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+&lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="n"&gt;__attribute__&lt;/span&gt;&lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="n"&gt;packed&lt;/span&gt;&lt;span class="p"&gt;));&lt;/span&gt;
+
+&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;boot_params&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;screen_info&lt;/span&gt; &lt;span class="n"&gt;screen_info&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;             &lt;span class="cm"&gt;/* 0x000 */&lt;/span&gt;
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;apm_bios_info&lt;/span&gt; &lt;span class="n"&gt;apm_bios_info&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;         &lt;span class="cm"&gt;/* 0x040 */&lt;/span&gt;
+    &lt;span class="n"&gt;__u8&lt;/span&gt;  &lt;span class="n"&gt;_pad2&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;4&lt;/span&gt;&lt;span class="p"&gt;];&lt;/span&gt;                             &lt;span class="cm"&gt;/* 0x054 */&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+&lt;span class="hll"&gt;    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;setup_header&lt;/span&gt; &lt;span class="n"&gt;hdr&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;    &lt;span class="cm"&gt;/* setup header */&lt;/span&gt;  &lt;span class="cm"&gt;/* 0x1f1 */&lt;/span&gt;
+&lt;/span&gt;    &lt;span class="n"&gt;__u8&lt;/span&gt;  &lt;span class="n"&gt;_pad7&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mh"&gt;0x290&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mh"&gt;0x1f1&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="k"&gt;sizeof&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;setup_header&lt;/span&gt;&lt;span class="p"&gt;)];&lt;/span&gt;
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="n"&gt;__attribute__&lt;/span&gt;&lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="n"&gt;packed&lt;/span&gt;&lt;span class="p"&gt;));&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;ARM 架構則是要求 bootloader 以 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/arch/arm/include/uapi/asm/setup.h?v=4.1#L146"&gt;struct tag&lt;/a&gt; 格式將資料傳給核心。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_header&lt;/span&gt; &lt;span class="n"&gt;hdr&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;union&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_core&lt;/span&gt;     &lt;span class="n"&gt;core&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_mem32&lt;/span&gt;    &lt;span class="n"&gt;mem&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_videotext&lt;/span&gt;    &lt;span class="n"&gt;videotext&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_ramdisk&lt;/span&gt;  &lt;span class="n"&gt;ramdisk&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_initrd&lt;/span&gt;   &lt;span class="n"&gt;initrd&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_serialnr&lt;/span&gt; &lt;span class="n"&gt;serialnr&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_revision&lt;/span&gt; &lt;span class="n"&gt;revision&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_videolfb&lt;/span&gt; &lt;span class="n"&gt;videolfb&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="hll"&gt;        &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;tag_cmdline&lt;/span&gt;  &lt;span class="n"&gt;cmdline&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;/span&gt;
+        &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="n"&gt;u&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;核心會在 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L492"&gt;start_kernel()&lt;/a&gt; 內對傳到核心的參數字串進行解析。主要會分為兩個階段，分別由 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L436"&gt;parse_early_param()&lt;/a&gt; 及 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191"&gt;parse_args()&lt;/a&gt; 這兩個函式進行解析。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="n"&gt;asmlinkage&lt;/span&gt; &lt;span class="n"&gt;__visible&lt;/span&gt; &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;start_kernel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;void&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;command_line&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;// a pointer to the kernel command line&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;after_dashes&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+    &lt;span class="n"&gt;setup_arch&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;command_line&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;        &lt;span class="c1"&gt;// architecture-specific setup&lt;/span&gt;
+
+    &lt;span class="n"&gt;setup_command_line&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;command_line&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;// store the untouched command line&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+
+    &lt;span class="n"&gt;pr_notice&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Kernel command line: %s&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;boot_command_line&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="n"&gt;parse_early_param&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;                         &lt;span class="c1"&gt;// parse options for early_param()&lt;/span&gt;
+    &lt;span class="n"&gt;after_dashes&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;parse_args&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Booting kernel&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// parse options for module_param(), module_param_named(), core_param()&lt;/span&gt;
+                  &lt;span class="n"&gt;static_command_line&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;__start___param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+                  &lt;span class="n"&gt;__stop___param&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;__start___param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+                  &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;unknown_bootoption&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;  &lt;span class="c1"&gt;// parse options for __setup()&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;IS_ERR_OR_NULL&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;after_dashes&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+        &lt;span class="n"&gt;parse_args&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Setting init args&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;after_dashes&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;NULL&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// after_dashes will be passed to the init process as argv&lt;/span&gt;
+               &lt;span class="n"&gt;set_init_arg&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;div class="section" id="early-param"&gt;
+&lt;h2&gt;early_param&lt;/h2&gt;
+&lt;p&gt;有些參數有較高的優先權，需要先被處理，這類的參數被稱為 early_param。舉例來說，像 log level
+的設定會影響訊息的輸出，若太晚生效的話，有些除錯訊息可能就不會被看到。&lt;/p&gt;
+&lt;div class="section" id="early-option-example"&gt;
+&lt;h3&gt;Early option example&lt;/h3&gt;
+&lt;blockquote&gt;
+&lt;pre class="code literal-block"&gt;
+debug       [KNL] Enable kernel debugging (events log level).
+
+quiet       [KNL] Disable most log messages
+
+loglevel=   All Kernel Messages with a loglevel smaller than the
+            console loglevel will be printed to the console. It can
+            also be changed with klogd or other programs. The
+            loglevels are defined as follows:
+
+            0 (KERN_EMERG)      system is unusable
+            1 (KERN_ALERT)      action must be taken immediately
+            2 (KERN_CRIT)       critical conditions
+            3 (KERN_ERR)        error conditions
+            4 (KERN_WARNING)    warning conditions
+            5 (KERN_NOTICE)     normal but significant condition
+            6 (KERN_INFO)       informational
+            7 (KERN_DEBUG)      debug-level messages
+&lt;/pre&gt;
+&lt;p&gt;以 &amp;quot;debug&amp;quot; 這個參數為例，它的功用是把 log level 設到 debug-level，允許更多的訊息輸出方便除錯。為了處理 &amp;quot;debug&amp;quot; 參數的設定，在核心內部定義了一個 debug_kernel() 函式負責處理 &amp;quot;debug&amp;quot; 參數的設定，然後利用 early_param() 這個 macro 將 &amp;quot;debug&amp;quot; 和處理函式 debug_kernel 關聯起來。&amp;quot;quiet&amp;quot; 參數也是一樣的處理方式。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;debug_kernel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;console_loglevel&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;CONSOLE_LOGLEVEL_DEBUG&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;// console_loglevel = 10&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;quiet_kernel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;console_loglevel&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;CONSOLE_LOGLEVEL_QUIET&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;// console_loglevel = 4&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="n"&gt;early_param&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;debug&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;debug_kernel&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="n"&gt;early_param&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;quiet&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;quiet_kernel&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;在 4.1 的核心中，主要有兩種方式處理核心參數，其中一種較單純，使用 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243"&gt;struct obs_kernel_param&lt;/a&gt; 來記錄字串參數與處理函式的關聯，並透過 __setup_param()
+macro 來設定。early_param() 屬於這種方式。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;obs_kernel_param&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;             &lt;span class="c1"&gt;// param&amp;#39;s name&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;setup_func&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;   &lt;span class="c1"&gt;// handler function&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;early&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;                   &lt;span class="c1"&gt;// true if it&amp;#39;s a early_param&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+
+&lt;span class="cm"&gt;/*&lt;/span&gt;
+&lt;span class="cm"&gt; * Only for really core code.  See moduleparam.h for the normal way.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * Force the alignment so the compiler doesn&amp;#39;t space elements of the&lt;/span&gt;
+&lt;span class="cm"&gt; * obs_kernel_param &amp;quot;array&amp;quot; too far apart in .init.setup.&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="cp"&gt;#define __setup_param(str, unique_id, fn, early)              \&lt;/span&gt;
+&lt;span class="cp"&gt;    static const char __setup_str_##unique_id[] __initconst   \&lt;/span&gt;
+&lt;span class="cp"&gt;        __aligned(1) = str;                                   \&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;    static struct obs_kernel_param __setup_##unique_id        \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;        __used __section(.init.setup)                         \&lt;/span&gt;
+&lt;span class="cp"&gt;        __attribute__((aligned((sizeof(long)))))              \&lt;/span&gt;
+&lt;span class="cp"&gt;        = { __setup_str_##unique_id, fn, early }&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define __setup(str, fn)   \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    __setup_param(str, fn, fn, 0)&lt;/span&gt;
+
+&lt;span class="cm"&gt;/*&lt;/span&gt;
+&lt;span class="cm"&gt; * NOTE: fn is as per module_param, not __setup!&lt;/span&gt;
+&lt;span class="cm"&gt; * Emits warning if fn returns non-zero.&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define early_param(str, fn)   \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    __setup_param(str, fn, fn, 1)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;值得注意的是: __setup_param() 會對 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243"&gt;struct obs_kernel_param&lt;/a&gt;
+附加 __section(.init.setup) 屬性，透過這個 macro 定義的資料會被放在
+&lt;code&gt;.init.setup&lt;/code&gt; section 之中。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="parse-early-param"&gt;
+&lt;h2&gt;parse_early_param&lt;/h2&gt;
+&lt;p&gt;parse_early_param() 如其名，是核心用來解析 early_param 的函式。&lt;/p&gt;
+&lt;p&gt;init/main.c: &lt;a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L436"&gt;parse_early_param()&lt;/a&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Arch code calls this early on, or if not, just before other parsing. */&lt;/span&gt;
+&lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;parse_early_param&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;void&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;done&lt;/span&gt; &lt;span class="n"&gt;__initdata&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="n"&gt;tmp_cmdline&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;COMMAND_LINE_SIZE&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="n"&gt;__initdata&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;done&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="k"&gt;return&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* All fall through to do_early_param. */&lt;/span&gt;
+    &lt;span class="n"&gt;strlcpy&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tmp_cmdline&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;boot_command_line&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;COMMAND_LINE_SIZE&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="n"&gt;parse_early_options&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tmp_cmdline&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="n"&gt;done&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;parse_early_options&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;cmdline&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;parse_args&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;early options&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;cmdline&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="cm"&gt;/*kernel_param=*/&lt;/span&gt;&lt;span class="nb"&gt;NULL&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;do_early_param&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;上面的 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191"&gt;parse_args()&lt;/a&gt; 會將 cmdline 拆成一組一組的 param, value，傳入 do_early_param()&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Check for early params. */&lt;/span&gt;
+&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;do_early_param&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;unused&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;obs_kernel_param&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;p&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;__setup_start&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;__setup_end&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;early&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="n"&gt;parameq&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="o"&gt;||&lt;/span&gt;          &lt;span class="c1"&gt;// if p-&amp;gt;early is true&lt;/span&gt;
+            &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;strcmp&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;console&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+             &lt;span class="n"&gt;strcmp&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;earlycon&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+&lt;span class="hll"&gt;            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;setup_func&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;                     &lt;span class="c1"&gt;// call param&amp;#39;s setup_func()&lt;/span&gt;
+&lt;/span&gt;                &lt;span class="n"&gt;pr_warn&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Malformed early option &amp;#39;%s&amp;#39;&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+        &lt;span class="p"&gt;}&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+    &lt;span class="cm"&gt;/* We accept everything at this stage. */&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;還記得上面提到 __setup_param() 會附加 __section(.init.setup) 屬性到 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243"&gt;struct obs_kernel_param&lt;/a&gt;
+的資料上嗎？核心在這邊使用了一個技巧，透過這個屬性，讓 linker 把 struct obs_kernel_param
+的資料集中在一起，然後利用 __setup_start 和 __setup_end 將這個區域標示出來。&lt;/p&gt;
+&lt;p&gt;__setup_start 和 __setup_end 實際上是被定義在 linker script
+&lt;em&gt;include/asm-generic/vmlinux.lds.h&lt;/em&gt; 之中:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+#define INIT_SETUP(initsetup_align)         \
+    . = ALIGN(initsetup_align);             \
+    VMLINUX_SYMBOL(__setup_start) = .;      \
+    *(.init.setup)                          \
+    VMLINUX_SYMBOL(__setup_end) = .;
+&lt;/pre&gt;
+&lt;p&gt;觀察 System.map 可以了解實際的布局 (下面是 x86_64 的 System.map)&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+ffffffff81e7c9b0 T __setup_start
+ffffffff81e7c9c8 t __setup_rdinit_setup
+ffffffff81e7c9e0 t __setup_init_setup
+ffffffff81e7c9f8 t __setup_loglevel
+ffffffff81e7ca10 t __setup_quiet_kernel
+ffffffff81e7ca28 t __setup_debug_kernel
+...
+ffffffff81e7e5b8 T __setup_end
+&lt;/pre&gt;
+&lt;p&gt;了解這個技巧，do_early_param() 的程式碼就很容易理解了，基本上就是逐個比較 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243"&gt;struct obs_kernel_param&lt;/a&gt;
+是不是符合傳進來的 param name，若符合則將值傳入 setup_func() 中進行設定。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="module-param"&gt;
+&lt;h2&gt;Module param&lt;/h2&gt;
+&lt;p&gt;上面討論的 obs_kernel_param 的 obs 是 obsolete 的意思，看起來是打算讓它功成身退，但是一直沒動作，就這樣一直放著...。 而用來取代舊的參數處理結構的是升級後的 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68"&gt;struct kernel_param&lt;/a&gt;。從它被放在 include/linux/moduleparam.h 大概可以猜測新的結構主要是以支援模組參數為主，擴增到一般性的核心參數。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param_ops&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;u16&lt;/span&gt; &lt;span class="n"&gt;perm&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;s8&lt;/span&gt; &lt;span class="n"&gt;level&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;u8&lt;/span&gt; &lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;union&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;arg&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kparam_string&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;str&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kparam_array&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;arr&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;新的 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68"&gt;struct kernel_param&lt;/a&gt; 更為一般化，物件化，kernel_param_ops 提供 set/get method，負責參數的設定與保存。除了在啟動時可以經由 bootloader 設定參數，開機之後，kernel_param
+也會被掛載到 sysfs 上，可以透過
+/sys/module/&lt;span class="blue"&gt;&amp;lt;module-name&amp;gt;&lt;/span&gt;/parameters/&lt;span class="blue"&gt;&amp;lt;param-name&amp;gt;&lt;/span&gt;
+讀取或設定參數。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param_ops&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="cm"&gt;/* How the ops should behave */&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="cm"&gt;/* Returns 0, or -errno.  arg is in kp-&amp;gt;arg. */&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;set&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;kp&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="cm"&gt;/* Returns length written or -errno.  Buffer is 4k (ie. be short!) */&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;get&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;buffer&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;kp&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="cm"&gt;/* Optional function to free kp-&amp;gt;arg when module unloaded. */&lt;/span&gt;
+    &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;free&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;arg&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+
+&lt;span class="cm"&gt;/* Special one for strings we want to copy into */&lt;/span&gt;
+&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kparam_string&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;maxlen&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;string&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+
+&lt;span class="cm"&gt;/* Special one for arrays */&lt;/span&gt;
+&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kparam_array&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;max&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;elemsize&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;num&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param_ops&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;elem&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* This is the fundamental function for registering boot/module parameters. */&lt;/span&gt;
+&lt;span class="cp"&gt;#define __module_param_call(prefix, name, ops, arg, perm, level, flags) \&lt;/span&gt;
+&lt;span class="cp"&gt;    &lt;/span&gt;&lt;span class="cm"&gt;/* Default value instead of permissions? */&lt;/span&gt;&lt;span class="cp"&gt;                         \&lt;/span&gt;
+&lt;span class="cp"&gt;    static const char __param_str_##name[] = prefix #name;              \&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;    static struct kernel_param __moduleparam_const __param_##name       \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    __used                                                              \&lt;/span&gt;
+&lt;span class="cp"&gt;    __attribute__ ((unused,__section__ (&amp;quot;__param&amp;quot;),aligned(sizeof(void *)))) \&lt;/span&gt;
+&lt;span class="cp"&gt;    = { __param_str_##name, ops, VERIFY_OCTAL_PERMISSIONS(perm), level, flags, { arg } }&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68"&gt;struct kernel_param&lt;/a&gt; 主要是透過 __module_param_call() 這個 macro 來設定，與
+struct obs_kernel_param 類似，這個 macro 會將 __section__ (&amp;quot;__param&amp;quot;) 的屬性設給
+struct kernel_param 的資料，讓 linker 將資料集中在一起。&lt;/p&gt;
+&lt;p&gt;另外，在上面的 macro 中我們可以發現如下的參數名宣告:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+static const char __param_str_##name[] = prefix #name;
+&lt;/pre&gt;
+&lt;p&gt;這個字串會被指派給 struct kernel_param 的 name 欄位。新的 struct kernel_param 被引入的同時，參數的命名方式也做了調整，新的命名方式引入了
+module name 當作前綴 (prefix)，這是一種命名空間 (namespace) 的概念，新的命名規則讓各個模組更容易擁有屬於自已的參數，而不必太過煩腦命名衝突的問題。&lt;/p&gt;
+&lt;p&gt;模組參數通常以 module_param() 或是以 module_param_named() 來宣告。
+以 &amp;quot;printk&amp;quot; 模組的 &amp;quot;time&amp;quot; 參數為例 (kernel/printk/printk.c: &lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/printk/printk.c?v=4.1#L996"&gt;printk_time&lt;/a&gt;)，宣告如下:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+static bool printk_time = IS_ENABLED(CONFIG_PRINTK_TIME);
+module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
+&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;name: &lt;code&gt;&amp;quot;time&amp;quot;&lt;/code&gt; =&amp;gt; &lt;code&gt;&amp;quot;printk.time&amp;quot;&lt;/code&gt; with KBUILD_MODNAME &amp;quot;printk&amp;quot; and a &amp;quot;.&amp;quot; as prefix&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;value: &lt;code&gt;printk_time&lt;/code&gt; (the actual lvalue to alter)&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;type: &lt;code&gt;bool&lt;/code&gt; =&amp;gt; &lt;code&gt;param_ops_bool&lt;/code&gt; (the set &amp;amp; get operations for this parameter)&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;perm: &lt;code&gt;S_IRUGO | S_IWUSR&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;the parameter &lt;code&gt;&amp;quot;printk.time&amp;quot;&lt;/code&gt; can also be found at &lt;em&gt;/sys/module/printk/parameters/time&lt;/em&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;值的特別一提的是第三個參數 type：
+新的 struct kernel_param 針對像 bool, int, byte ... 等基礎的通用型態提供共用的
+struct kernel_param_ops 及其 set/get method，並以 &lt;code&gt;param_ops_##type&lt;/code&gt; 命名。在上面例子中，&amp;quot;printk.time&amp;quot; 是 bool 型態的參數，會透過 &lt;code&gt;param_ops_bool&lt;/code&gt; 存取設定。其他支援的型態請參照下面 module_param() 的註解說明。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/**&lt;/span&gt;
+&lt;span class="cm"&gt; * module_param - typesafe helper for a module/cmdline parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @value: the variable to alter, and exposed parameter name.&lt;/span&gt;
+&lt;span class="cm"&gt; * @type: the type of the parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @perm: visibility in sysfs.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * @value becomes the module parameter, or (prefixed by KBUILD_MODNAME and a&lt;/span&gt;
+&lt;span class="cm"&gt; * &amp;quot;.&amp;quot;) the kernel commandline parameter.  Note that - is changed to _, so&lt;/span&gt;
+&lt;span class="cm"&gt; * the user can use &amp;quot;foo-bar=1&amp;quot; even for variable &amp;quot;foo_bar&amp;quot;.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * @perm is 0 if the the variable is not to appear in sysfs, or 0444&lt;/span&gt;
+&lt;span class="cm"&gt; * for world-readable, 0644 for root-writable, etc.  Note that if it&lt;/span&gt;
+&lt;span class="cm"&gt; * is writable, you may need to use kparam_block_sysfs_write() around&lt;/span&gt;
+&lt;span class="cm"&gt; * accesses (esp. charp, which can be kfreed when it changes).&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * The @type is simply pasted to refer to a param_ops_##type and a&lt;/span&gt;
+&lt;span class="cm"&gt; * param_check_##type: for convenience many standard types are provided but&lt;/span&gt;
+&lt;span class="cm"&gt; * you can create your own by defining those variables.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * Standard types are:&lt;/span&gt;
+&lt;span class="cm"&gt; *  byte, short, ushort, int, uint, long, ulong&lt;/span&gt;
+&lt;span class="cm"&gt; *  charp: a character pointer&lt;/span&gt;
+&lt;span class="cm"&gt; *  bool: a bool, values 0/1, y/n, Y/N.&lt;/span&gt;
+&lt;span class="cm"&gt; *  invbool: the above, only sense-reversed (N = true).&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define module_param(name, type, perm)   \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    module_param_named(name, name, type, perm)&lt;/span&gt;
+
+
+&lt;span class="cm"&gt;/**&lt;/span&gt;
+&lt;span class="cm"&gt; * module_param_named - typesafe helper for a renamed module/cmdline parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @name: a valid C identifier which is the parameter name.&lt;/span&gt;
+&lt;span class="cm"&gt; * @value: the actual lvalue to alter.&lt;/span&gt;
+&lt;span class="cm"&gt; * @type: the type of the parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @perm: visibility in sysfs.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * Usually it&amp;#39;s a good idea to have variable names and user-exposed names the&lt;/span&gt;
+&lt;span class="cm"&gt; * same, but that&amp;#39;s harder if the variable must be non-static or is inside a&lt;/span&gt;
+&lt;span class="cm"&gt; * structure.  This allows exposure under a different name.&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define module_param_named(name, value, type, perm)            \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    param_check_##type(name, &amp;amp;(value));                        \&lt;/span&gt;
+&lt;span class="cp"&gt;    module_param_cb(name, &amp;amp;param_ops_##type, &amp;amp;value, perm);    \&lt;/span&gt;
+&lt;span class="cp"&gt;    __MODULE_PARM_TYPE(name, #type)&lt;/span&gt;
+
+
+&lt;span class="cm"&gt;/**&lt;/span&gt;
+&lt;span class="cm"&gt; * module_param_cb - general callback for a module/cmdline parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @name: a valid C identifier which is the parameter name.&lt;/span&gt;
+&lt;span class="cm"&gt; * @ops: the set &amp;amp; get operations for this parameter.&lt;/span&gt;
+&lt;span class="cm"&gt; * @perm: visibility in sysfs.&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * The ops can have NULL set or get functions.&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define module_param_cb(name, ops, arg, perm)  \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    __module_param_call(MODULE_PARAM_PREFIX, name, ops, arg, perm, -1, 0)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;除了 module 外，struct kernel_param 也可用在一般核心的參數設定上，使用 core_param() macro 來宣告，因為不是給特定模組的參數，所以前綴 (prefix) 為空。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/**&lt;/span&gt;
+&lt;span class="cm"&gt; * core_param - define a historical core kernel parameter.&lt;/span&gt;
+&lt;span class="cm"&gt; * @name: the name of the cmdline and sysfs parameter (often the same as var)&lt;/span&gt;
+&lt;span class="cm"&gt; * @var: the variable&lt;/span&gt;
+&lt;span class="cm"&gt; * @type: the type of the parameter&lt;/span&gt;
+&lt;span class="cm"&gt; * @perm: visibility in sysfs&lt;/span&gt;
+&lt;span class="cm"&gt; *&lt;/span&gt;
+&lt;span class="cm"&gt; * core_param is just like module_param(), but cannot be modular and&lt;/span&gt;
+&lt;span class="cm"&gt; * doesn&amp;#39;t add a prefix (such as &amp;quot;printk.&amp;quot;).  This is for compatibility&lt;/span&gt;
+&lt;span class="cm"&gt; * with __setup(), and it makes sense as truly core parameters aren&amp;#39;t&lt;/span&gt;
+&lt;span class="cm"&gt; * tied to the particular file they&amp;#39;re in.&lt;/span&gt;
+&lt;span class="cm"&gt; */&lt;/span&gt;
+&lt;span class="hll"&gt;&lt;span class="cp"&gt;#define core_param(name, var, type, perm)    \&lt;/span&gt;
+&lt;/span&gt;&lt;span class="cp"&gt;    param_check_##type(name, &amp;amp;(var));        \&lt;/span&gt;
+&lt;span class="cp"&gt;    __module_param_call(&amp;quot;&amp;quot;, name, &amp;amp;param_ops_##type, &amp;amp;var, perm, -1, 0)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="parse-args"&gt;
+&lt;h2&gt;parse_args&lt;/h2&gt;
+&lt;p&gt;&lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191"&gt;parse_args()&lt;/a&gt; 負責解析字串參數，處理屬於 struct kernel_param 的參數設定，在核心啟動時由
+start_kernel() 處進入。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="n"&gt;asmlinkage&lt;/span&gt; &lt;span class="n"&gt;__visible&lt;/span&gt; &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;__init&lt;/span&gt; &lt;span class="nf"&gt;start_kernel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;void&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;command_line&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;// a pointer to the kernel command line&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;after_dashes&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+    &lt;span class="n"&gt;pr_notice&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Kernel command line: %s&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;boot_command_line&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="n"&gt;parse_early_param&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;              &lt;span class="c1"&gt;// parse options for early_param()&lt;/span&gt;
+&lt;span class="hll"&gt;    &lt;span class="n"&gt;after_dashes&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;parse_args&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Booting kernel&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;static_command_line&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// parse options for module_param(), module_param_named(), core_param()&lt;/span&gt;
+&lt;/span&gt;                  &lt;span class="n"&gt;__start___param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;                   &lt;span class="c1"&gt;// array of struct kernel_param&lt;/span&gt;
+                  &lt;span class="n"&gt;__stop___param&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;__start___param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// number of params&lt;/span&gt;
+                  &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;unknown_bootoption&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;      &lt;span class="c1"&gt;// parse options for __setup()&lt;/span&gt;
+
+    &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191"&gt;parse_args()&lt;/a&gt; 要求提供 kernel_param 的處理陣列。
+這邊和上面提到的 do_early_param() 使用一樣的技巧，
+__start___param 和 __stop___param 被定義在 linker script
+&lt;em&gt;include/asm-generic/vmlinux.lds.h&lt;/em&gt; 裡，中間是 __param section，
+由 module_param(), module_param_named(), core_param() 等 macro 宣告的
+struct kernel_param 參數處理結構。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+/* Built-in module parameters. */             \
+__param : AT(ADDR(__param) - LOAD_OFFSET) {   \
+    VMLINUX_SYMBOL(__start___param) = .;      \
+    *(__param)                                \
+    VMLINUX_SYMBOL(__stop___param) = .;       \
+}
+&lt;/pre&gt;
+&lt;p&gt;來看一下 System.map (x86_64)，觀察一下實際的布局情形:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+ffffffff81ba3768 R __start___param
+ffffffff81ba3788 r __param_dis_ucode_ldr
+ffffffff81ba37a8 r __param_trace_pc
+ffffffff81ba37c8 r __param_nommiotrace
+ffffffff81ba37e8 r __param_filter_offset
+ffffffff81ba3808 r __param_panic_on_warn
+ffffffff81ba3828 r __param_pause_on_oops
+ffffffff81ba3848 r __param_panic
+...
+ffffffff81ba55e8 R __stop___param
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191"&gt;parse_args()&lt;/a&gt; 的實作:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;由 next_arg() 解析出下一對的 param, value 組合&lt;/li&gt;
+&lt;li&gt;由 parse_one() 對應到符合的 struct kernel_param 資料&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Args looks like &amp;quot;foo=bar,bar2 baz=fuz wiz&amp;quot;. */&lt;/span&gt;
+&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="nf"&gt;parse_args&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// doing message. e.g. &amp;quot;early options&amp;quot;, &amp;quot;Booting kernel&amp;quot;, &amp;quot;Setting init args&amp;quot;&lt;/span&gt;
+         &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;                 &lt;span class="c1"&gt;// command line string&lt;/span&gt;
+         &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="n"&gt;num&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// array of struct kernel_param&lt;/span&gt;
+         &lt;span class="n"&gt;s16&lt;/span&gt; &lt;span class="n"&gt;min_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;s16&lt;/span&gt; &lt;span class="n"&gt;max_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+         &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;unknown&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* Chew leading spaces */&lt;/span&gt;
+    &lt;span class="n"&gt;args&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;skip_spaces&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="n"&gt;pr_debug&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;doing %s, parsing ARGS: &amp;#39;%s&amp;#39;&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;while&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;ret&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;irq_was_disabled&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+&lt;span class="hll"&gt;        &lt;span class="n"&gt;args&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;next_arg&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;  &lt;span class="c1"&gt;// get the next [param, val] pair&lt;/span&gt;
+&lt;/span&gt;        &lt;span class="cm"&gt;/* Stop at -- */&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="n"&gt;strcmp&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;--&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+            &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;args&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="n"&gt;irq_was_disabled&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;irqs_disabled&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+&lt;span class="hll"&gt;        &lt;span class="n"&gt;ret&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;parse_one&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;num&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+&lt;/span&gt;                &lt;span class="n"&gt;min_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;max_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;unknown&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;irq_was_disabled&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;irqs_disabled&lt;/span&gt;&lt;span class="p"&gt;())&lt;/span&gt;
+            &lt;span class="n"&gt;pr_warn&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;%s: option &amp;#39;%s&amp;#39; enabled irq&amp;#39;s!&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+        &lt;span class="p"&gt;...&lt;/span&gt; &lt;span class="n"&gt;omitted&lt;/span&gt; &lt;span class="p"&gt;...&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* All parsed OK. */&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="nb"&gt;NULL&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;parse_one() 以線性搜尋的方式，比對出符合的 struct kernel_param。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="nf"&gt;parse_one&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;  &lt;span class="c1"&gt;// the [param, val] pair&lt;/span&gt;
+             &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+             &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;kernel_param&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="n"&gt;num_params&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+             &lt;span class="n"&gt;s16&lt;/span&gt; &lt;span class="n"&gt;min_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;s16&lt;/span&gt; &lt;span class="n"&gt;max_level&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+             &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;handle_unknown&lt;/span&gt;&lt;span class="p"&gt;)(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;const&lt;/span&gt; &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;err&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* Find parameter */&lt;/span&gt;
+    &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="n"&gt;i&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;num_params&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+&lt;span class="hll"&gt;        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;parameq&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;     &lt;span class="c1"&gt;// match param&amp;#39;s name with kernel_param&lt;/span&gt;
+&lt;/span&gt;            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;level&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;min_level&lt;/span&gt; &lt;span class="o"&gt;||&lt;/span&gt; &lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;level&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="n"&gt;max_level&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+                &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+            &lt;span class="cm"&gt;/* No one handled NULL, so do it here. */&lt;/span&gt;
+            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="n"&gt;KERNEL_PARAM_OPS_FL_NOARG&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+                &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="n"&gt;EINVAL&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+            &lt;span class="n"&gt;pr_debug&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;handling %s with %p&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;set&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+            &lt;span class="n"&gt;mutex_lock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;param_lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+            &lt;span class="n"&gt;param_check_unsafe&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;]);&lt;/span&gt;
+&lt;span class="hll"&gt;            &lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;set&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;params&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;]);&lt;/span&gt;   &lt;span class="c1"&gt;// call kernel_param_ops-&amp;gt;set()&lt;/span&gt;
+&lt;/span&gt;            &lt;span class="n"&gt;mutex_unlock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;param_lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+            &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;err&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="p"&gt;}&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;handle_unknown&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;   &lt;span class="c1"&gt;// handle_unknown = do_early_param(), or unknown_bootoption(), ...&lt;/span&gt;
+        &lt;span class="n"&gt;pr_debug&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;doing %s: %s=&amp;#39;%s&amp;#39;&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+        &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;handle_unknown&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;doing&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+
+    &lt;span class="n"&gt;pr_debug&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Unknown argument &amp;#39;%s&amp;#39;&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;param&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="n"&gt;ENOENT&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="reference"&gt;
+&lt;h2&gt;Reference&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;bootparam(7): &lt;a class="reference external" href="http://man7.org/linux/man-pages/man7/bootparam.7.html"&gt;http://man7.org/linux/man-pages/man7/bootparam.7.html&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Kernel Parameters: &lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/kernel-parameters.txt"&gt;https://www.kernel.org/doc/Documentation/kernel-parameters.txt&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;The Linux/x86 Boot Protocol: &lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/x86/boot.txt"&gt;https://www.kernel.org/doc/Documentation/x86/boot.txt&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Booting ARM Linux: &lt;a class="reference external" href="https://www.kernel.org/doc/Documentation/arm/Booting"&gt;https://www.kernel.org/doc/Documentation/arm/Booting&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+</summary><category term="Linux kernel"></category></entry><entry><title>深入淺出 start_kernel()</title><link href="https://danielmaker.github.io/blog/linux/inside_start_kernel.html" rel="alternate"></link><updated>2016-05-16T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-05-16:blog/linux/inside_start_kernel.html</id><summary type="html">&lt;p&gt;當 bootloader 載入核心映像檔(zImage, or bzImage) 之後，在核心映像檔最開頭的 bootstrap code 會負責關閉中斷，初始化記憶體設定等硬體初始化工作，最後解壓縮內核。
 不同的硬體架構會有不同的設定方式，大致的流程如下圖所示：&lt;/p&gt;
 &lt;?xml version="1.0" encoding="UTF-8" standalone="no"?&gt;
 &lt;!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"

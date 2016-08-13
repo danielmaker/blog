@@ -62,6 +62,35 @@
   		<article>
 <header>
       <h1 class="entry-title">
+        <a href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">核心參數解析</a>
+      </h1>
+    <p class="meta">
+<time datetime="2016-08-13T00:00:00+08:00" pubdate>2016-08-13, Sat</time>    </p>
+</header>
+
+  <div class="entry-content"><!-- ............................................................................. -->
+<style type="text/css">
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+    .diagram {line-height: 1;}
+</style><!-- ............................................................................. -->
+<p>Linux 核心啟動時會解析由 bootloader 傳來的參數，來設定核心運作時的行為。</p>
+<p>傳給核心的參數是以空格分隔的字串，通常的型式如下:</p>
+<blockquote>
+param[=value_1][,value_2]...[,value_10]</blockquote>
+<p>&quot;param&quot; 是關鍵字，後面跟著設定值，以逗號分隔。一個關鍵字後面最多可以有 10 個值，但是可以透過再次使用同一關鍵字的方式，傳遞超過 10 個以上的參數。</p>
+<p>舉例來說，bootloader 可以透過 ...</p></div>
+  <footer>
+    <a rel="full-article" href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">Read On &crarr;</a>
+  </footer>
+  		</article>
+  		<article>
+<header>
+      <h1 class="entry-title">
         <a href="https://danielmaker.github.io/blog/linux/inside_start_kernel.html">深入淺出 start_kernel()</a>
       </h1>
     <p class="meta">
@@ -210,6 +239,9 @@
   <section>
     <h1>Recent Posts</h1>
     <ul id="recent_posts">
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">核心參數解析</a>
+      </li>
       <li class="post">
           <a href="https://danielmaker.github.io/blog/linux/inside_start_kernel.html">深入淺出 start_kernel()</a>
       </li>

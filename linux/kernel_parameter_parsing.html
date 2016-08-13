@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>核心參數解析 &mdash; Daniel Jslin</title>
+  <meta name="author" content="Daniel Lin">
+
+  <link href="https://danielmaker.github.io/blog/feeds/atom.xml" type="application/atom+xml" rel="alternate"
+        title="Daniel Jslin Atom Feed" />
+  <link href="https://danielmaker.github.io/blog/feeds/rss.xml" type="application/rss+xml" rel="alternate"
+        title="Daniel Jslin RSS Feed" />
+
+
+
+
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <link href="https://danielmaker.github.io/blog/favicon.png" rel="icon">
+
+  <link href="https://danielmaker.github.io/blog/theme/css/main.css" media="screen, projection"
+        rel="stylesheet" type="text/css">
+
+  <link href="//fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+  <link href="//fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic"
+        rel="stylesheet" type="text/css">
+</head>
+
+<body>
+  <header role="banner"><hgroup>
+  <h1><a href="https://danielmaker.github.io/blog/">Daniel Jslin</a></h1>
+    <h2>May the source be with you</h2>
+</hgroup></header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="https://danielmaker.github.io/blog/feeds/atom.xml" rel="subscribe-atom">Atom</a></li>
+  <li><a href="https://danielmaker.github.io/blog/feeds/rss.xml" rel="subscribe-rss">RSS</a></li>
+</ul>
+
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="danielmaker.github.io/blog">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+
+<ul class="main-navigation">
+      <li >
+        <a href="https://danielmaker.github.io/blog/category/about.html">About</a>
+      </li>
+      <li class="active">
+        <a href="https://danielmaker.github.io/blog/category/linux.html">Linux</a>
+      </li>
+</ul></nav>
+  <div id="main">
+    <div id="content">
+<div>
+  <article class="hentry" role="article">
+<header>
+      <h1 class="entry-title">核心參數解析</h1>
+    <p class="meta">
+<time datetime="2016-08-13T00:00:00+08:00" pubdate>2016-08-13, Sat</time>    </p>
+</header>
+
+  <div class="entry-content"><!-- ............................................................................. -->
+<style type="text/css">
+    .red    { color: red;   }
+    .blue   { color: blue;  }
+    .red-b  { color: red;  font-weight: bold; }
+    .blue-b { color: blue; font-weight: bold; }
+    .green  { color: green;  }
+    .gray   { color: gray;  }
+    .diagram {line-height: 1;}
+</style><!-- ............................................................................. -->
+<p>Linux 核心啟動時會解析由 bootloader 傳來的參數，來設定核心運作時的行為。</p>
+<p>傳給核心的參數是以空格分隔的字串，通常的型式如下:</p>
+<blockquote>
+param[=value_1][,value_2]...[,value_10]</blockquote>
+<p>&quot;param&quot; 是關鍵字，後面跟著設定值，以逗號分隔。一個關鍵字後面最多可以有 10 個值，但是可以透過再次使用同一關鍵字的方式，傳遞超過 10 個以上的參數。</p>
+<p>舉例來說，bootloader 可以透過 &quot;init=...&quot; 指定系統初始化的程序；或是透過 &quot;root=...&quot;
+指定 root filesystem device，如: &quot;root=/dev/hda3&quot;。</p>
+<p>這個由 bootloader 傳給核心的參數字串也可以包含傳給 init 程序的參數，核心只會解析到 &quot;--&quot;
+之前的字串，在 &quot;--&quot; 之後的字串會被當成傳給 init 程序的參數。</p>
+<p>詳細的核心參數說明，請參考下面兩份文件:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://man7.org/linux/man-pages/man7/bootparam.7.html">http://man7.org/linux/man-pages/man7/bootparam.7.html</a></li>
+<li><a class="reference external" href="https://www.kernel.org/doc/Documentation/kernel-parameters.txt">https://www.kernel.org/doc/Documentation/kernel-parameters.txt</a></li>
+</ul>
+<p>Linux 核心跟據不同的架構對 bootloader 有不同的要求。以 x86 架構來說，核心會需要 bootloader 將
+<a class="reference external" href="http://lxr.free-electrons.com/source/arch/x86/include/uapi/asm/bootparam.h?v=4.1#L113">struct boot_params</a> 的資料準備好，然後在核心啟動時傳給核心。核心參數字串就是包含在其中的
+<a class="reference external" href="http://lxr.free-electrons.com/source/arch/x86/include/uapi/asm/bootparam.h?v=4.1#L48">struct setup_header</a> 結構內的 cmd_line_ptr。</p>
+<blockquote>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">setup_header</span> <span class="p">{</span>
+    <span class="n">__u8</span>    <span class="n">setup_sects</span><span class="p">;</span>
+    <span class="n">__u16</span>   <span class="n">root_flags</span><span class="p">;</span>
+    <span class="n">__u32</span>   <span class="n">syssize</span><span class="p">;</span>
+    <span class="n">__u16</span>   <span class="n">ram_size</span><span class="p">;</span>
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+<span class="hll">    <span class="n">__u32</span>   <span class="n">cmd_line_ptr</span><span class="p">;</span>
+</span>    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+    <span class="n">__u32</span>   <span class="n">cmdline_size</span><span class="p">;</span>
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+<span class="p">}</span> <span class="n">__attribute__</span><span class="p">((</span><span class="n">packed</span><span class="p">));</span>
+
+<span class="k">struct</span> <span class="n">boot_params</span> <span class="p">{</span>
+    <span class="k">struct</span> <span class="n">screen_info</span> <span class="n">screen_info</span><span class="p">;</span>             <span class="cm">/* 0x000 */</span>
+    <span class="k">struct</span> <span class="n">apm_bios_info</span> <span class="n">apm_bios_info</span><span class="p">;</span>         <span class="cm">/* 0x040 */</span>
+    <span class="n">__u8</span>  <span class="n">_pad2</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span>                             <span class="cm">/* 0x054 */</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+<span class="hll">    <span class="k">struct</span> <span class="n">setup_header</span> <span class="n">hdr</span><span class="p">;</span>    <span class="cm">/* setup header */</span>  <span class="cm">/* 0x1f1 */</span>
+</span>    <span class="n">__u8</span>  <span class="n">_pad7</span><span class="p">[</span><span class="mh">0x290</span><span class="o">-</span><span class="mh">0x1f1</span><span class="o">-</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">setup_header</span><span class="p">)];</span>
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+<span class="p">}</span> <span class="n">__attribute__</span><span class="p">((</span><span class="n">packed</span><span class="p">));</span>
+</pre></div>
+</blockquote>
+<p>ARM 架構則是要求 bootloader 以 <a class="reference external" href="http://lxr.free-electrons.com/source/arch/arm/include/uapi/asm/setup.h?v=4.1#L146">struct tag</a> 格式將資料傳給核心。</p>
+<blockquote>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">tag</span> <span class="p">{</span>
+    <span class="k">struct</span> <span class="n">tag_header</span> <span class="n">hdr</span><span class="p">;</span>
+    <span class="k">union</span> <span class="p">{</span>
+        <span class="k">struct</span> <span class="n">tag_core</span>     <span class="n">core</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_mem32</span>    <span class="n">mem</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_videotext</span>    <span class="n">videotext</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_ramdisk</span>  <span class="n">ramdisk</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_initrd</span>   <span class="n">initrd</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_serialnr</span> <span class="n">serialnr</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_revision</span> <span class="n">revision</span><span class="p">;</span>
+        <span class="k">struct</span> <span class="n">tag_videolfb</span> <span class="n">videolfb</span><span class="p">;</span>
+<span class="hll">        <span class="k">struct</span> <span class="n">tag_cmdline</span>  <span class="n">cmdline</span><span class="p">;</span>
+</span>
+        <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+    <span class="p">}</span> <span class="n">u</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</blockquote>
+<p>核心會在 <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L492">start_kernel()</a> 內對傳到核心的參數字串進行解析。主要會分為兩個階段，分別由 <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L436">parse_early_param()</a> 及 <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191">parse_args()</a> 這兩個函式進行解析。</p>
+<blockquote>
+<div class="highlight"><pre><span class="n">asmlinkage</span> <span class="n">__visible</span> <span class="kt">void</span> <span class="n">__init</span> <span class="nf">start_kernel</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">command_line</span><span class="p">;</span>  <span class="c1">// a pointer to the kernel command line</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">after_dashes</span><span class="p">;</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+    <span class="n">setup_arch</span><span class="p">(</span><span class="o">&amp;</span><span class="n">command_line</span><span class="p">);</span>        <span class="c1">// architecture-specific setup</span>
+
+    <span class="n">setup_command_line</span><span class="p">(</span><span class="n">command_line</span><span class="p">);</span> <span class="c1">// store the untouched command line</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+
+    <span class="n">pr_notice</span><span class="p">(</span><span class="s">&quot;Kernel command line: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">boot_command_line</span><span class="p">);</span>
+    <span class="n">parse_early_param</span><span class="p">();</span>                         <span class="c1">// parse options for early_param()</span>
+    <span class="n">after_dashes</span> <span class="o">=</span> <span class="n">parse_args</span><span class="p">(</span><span class="s">&quot;Booting kernel&quot;</span><span class="p">,</span>  <span class="c1">// parse options for module_param(), module_param_named(), core_param()</span>
+                  <span class="n">static_command_line</span><span class="p">,</span> <span class="n">__start___param</span><span class="p">,</span>
+                  <span class="n">__stop___param</span> <span class="o">-</span> <span class="n">__start___param</span><span class="p">,</span>
+                  <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">unknown_bootoption</span><span class="p">);</span>  <span class="c1">// parse options for __setup()</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">IS_ERR_OR_NULL</span><span class="p">(</span><span class="n">after_dashes</span><span class="p">))</span>
+        <span class="n">parse_args</span><span class="p">(</span><span class="s">&quot;Setting init args&quot;</span><span class="p">,</span> <span class="n">after_dashes</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>  <span class="c1">// after_dashes will be passed to the init process as argv</span>
+               <span class="n">set_init_arg</span><span class="p">);</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+<div class="section" id="early-param">
+<h2>early_param</h2>
+<p>有些參數有較高的優先權，需要先被處理，這類的參數被稱為 early_param。舉例來說，像 log level
+的設定會影響訊息的輸出，若太晚生效的話，有些除錯訊息可能就不會被看到。</p>
+<div class="section" id="early-option-example">
+<h3>Early option example</h3>
+<blockquote>
+<pre class="code literal-block">
+debug       [KNL] Enable kernel debugging (events log level).
+
+quiet       [KNL] Disable most log messages
+
+loglevel=   All Kernel Messages with a loglevel smaller than the
+            console loglevel will be printed to the console. It can
+            also be changed with klogd or other programs. The
+            loglevels are defined as follows:
+
+            0 (KERN_EMERG)      system is unusable
+            1 (KERN_ALERT)      action must be taken immediately
+            2 (KERN_CRIT)       critical conditions
+            3 (KERN_ERR)        error conditions
+            4 (KERN_WARNING)    warning conditions
+            5 (KERN_NOTICE)     normal but significant condition
+            6 (KERN_INFO)       informational
+            7 (KERN_DEBUG)      debug-level messages
+</pre>
+<p>以 &quot;debug&quot; 這個參數為例，它的功用是把 log level 設到 debug-level，允許更多的訊息輸出方便除錯。為了處理 &quot;debug&quot; 參數的設定，在核心內部定義了一個 debug_kernel() 函式負責處理 &quot;debug&quot; 參數的設定，然後利用 early_param() 這個 macro 將 &quot;debug&quot; 和處理函式 debug_kernel 關聯起來。&quot;quiet&quot; 參數也是一樣的處理方式。</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">int</span> <span class="n">__init</span> <span class="nf">debug_kernel</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">console_loglevel</span> <span class="o">=</span> <span class="n">CONSOLE_LOGLEVEL_DEBUG</span><span class="p">;</span>  <span class="c1">// console_loglevel = 10</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span> <span class="n">__init</span> <span class="nf">quiet_kernel</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">console_loglevel</span> <span class="o">=</span> <span class="n">CONSOLE_LOGLEVEL_QUIET</span><span class="p">;</span>  <span class="c1">// console_loglevel = 4</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">early_param</span><span class="p">(</span><span class="s">&quot;debug&quot;</span><span class="p">,</span> <span class="n">debug_kernel</span><span class="p">);</span>
+<span class="n">early_param</span><span class="p">(</span><span class="s">&quot;quiet&quot;</span><span class="p">,</span> <span class="n">quiet_kernel</span><span class="p">);</span>
+</pre></div>
+<p>在 4.1 的核心中，主要有兩種方式處理核心參數，其中一種較單純，使用 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243">struct obs_kernel_param</a> 來記錄字串參數與處理函式的關聯，並透過 __setup_param()
+macro 來設定。early_param() 屬於這種方式。</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">obs_kernel_param</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">;</span>             <span class="c1">// param&#39;s name</span>
+    <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">setup_func</span><span class="p">)(</span><span class="kt">char</span> <span class="o">*</span><span class="p">);</span>   <span class="c1">// handler function</span>
+    <span class="kt">int</span> <span class="n">early</span><span class="p">;</span>                   <span class="c1">// true if it&#39;s a early_param</span>
+<span class="p">};</span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Only for really core code.  See moduleparam.h for the normal way.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Force the alignment so the compiler doesn&#39;t space elements of the</span>
+<span class="cm"> * obs_kernel_param &quot;array&quot; too far apart in .init.setup.</span>
+<span class="cm"> */</span>
+<span class="cp">#define __setup_param(str, unique_id, fn, early)              \</span>
+<span class="cp">    static const char __setup_str_##unique_id[] __initconst   \</span>
+<span class="cp">        __aligned(1) = str;                                   \</span>
+<span class="hll"><span class="cp">    static struct obs_kernel_param __setup_##unique_id        \</span>
+</span><span class="cp">        __used __section(.init.setup)                         \</span>
+<span class="cp">        __attribute__((aligned((sizeof(long)))))              \</span>
+<span class="cp">        = { __setup_str_##unique_id, fn, early }</span>
+</pre></div>
+<div class="highlight"><pre><span class="hll"><span class="cp">#define __setup(str, fn)   \</span>
+</span><span class="cp">    __setup_param(str, fn, fn, 0)</span>
+
+<span class="cm">/*</span>
+<span class="cm"> * NOTE: fn is as per module_param, not __setup!</span>
+<span class="cm"> * Emits warning if fn returns non-zero.</span>
+<span class="cm"> */</span>
+<span class="hll"><span class="cp">#define early_param(str, fn)   \</span>
+</span><span class="cp">    __setup_param(str, fn, fn, 1)</span>
+</pre></div>
+<p>值得注意的是: __setup_param() 會對 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243">struct obs_kernel_param</a>
+附加 __section(.init.setup) 屬性，透過這個 macro 定義的資料會被放在
+<code>.init.setup</code> section 之中。</p>
+</blockquote>
+</div>
+</div>
+<div class="section" id="parse-early-param">
+<h2>parse_early_param</h2>
+<p>parse_early_param() 如其名，是核心用來解析 early_param 的函式。</p>
+<p>init/main.c: <a class="reference external" href="http://lxr.free-electrons.com/source/init/main.c?v=4.1#L436">parse_early_param()</a></p>
+<blockquote>
+<div class="highlight"><pre><span class="cm">/* Arch code calls this early on, or if not, just before other parsing. */</span>
+<span class="kt">void</span> <span class="n">__init</span> <span class="nf">parse_early_param</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">static</span> <span class="kt">int</span> <span class="n">done</span> <span class="n">__initdata</span><span class="p">;</span>
+    <span class="k">static</span> <span class="kt">char</span> <span class="n">tmp_cmdline</span><span class="p">[</span><span class="n">COMMAND_LINE_SIZE</span><span class="p">]</span> <span class="n">__initdata</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">done</span><span class="p">)</span>
+        <span class="k">return</span><span class="p">;</span>
+
+    <span class="cm">/* All fall through to do_early_param. */</span>
+    <span class="n">strlcpy</span><span class="p">(</span><span class="n">tmp_cmdline</span><span class="p">,</span> <span class="n">boot_command_line</span><span class="p">,</span> <span class="n">COMMAND_LINE_SIZE</span><span class="p">);</span>
+    <span class="n">parse_early_options</span><span class="p">(</span><span class="n">tmp_cmdline</span><span class="p">);</span>
+    <span class="n">done</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span> <span class="n">__init</span> <span class="nf">parse_early_options</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">cmdline</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">parse_args</span><span class="p">(</span><span class="s">&quot;early options&quot;</span><span class="p">,</span> <span class="n">cmdline</span><span class="p">,</span> <span class="cm">/*kernel_param=*/</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">do_early_param</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+<p>上面的 <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191">parse_args()</a> 會將 cmdline 拆成一組一組的 param, value，傳入 do_early_param()</p>
+<div class="highlight"><pre><span class="cm">/* Check for early params. */</span>
+<span class="k">static</span> <span class="kt">int</span> <span class="n">__init</span> <span class="nf">do_early_param</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">param</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">unused</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">obs_kernel_param</span> <span class="o">*</span><span class="n">p</span><span class="p">;</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">p</span> <span class="o">=</span> <span class="n">__setup_start</span><span class="p">;</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="n">__setup_end</span><span class="p">;</span> <span class="n">p</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">((</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">early</span> <span class="o">&amp;&amp;</span> <span class="n">parameq</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">p</span><span class="o">-&gt;</span><span class="n">str</span><span class="p">))</span> <span class="o">||</span>          <span class="c1">// if p-&gt;early is true</span>
+            <span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s">&quot;console&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span>
+             <span class="n">strcmp</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">str</span><span class="p">,</span> <span class="s">&quot;earlycon&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span> <span class="p">{</span>
+<span class="hll">            <span class="k">if</span> <span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">setup_func</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>                     <span class="c1">// call param&#39;s setup_func()</span>
+</span>                <span class="n">pr_warn</span><span class="p">(</span><span class="s">&quot;Malformed early option &#39;%s&#39;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">param</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="cm">/* We accept everything at this stage. */</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>還記得上面提到 __setup_param() 會附加 __section(.init.setup) 屬性到 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243">struct obs_kernel_param</a>
+的資料上嗎？核心在這邊使用了一個技巧，透過這個屬性，讓 linker 把 struct obs_kernel_param
+的資料集中在一起，然後利用 __setup_start 和 __setup_end 將這個區域標示出來。</p>
+<p>__setup_start 和 __setup_end 實際上是被定義在 linker script
+<em>include/asm-generic/vmlinux.lds.h</em> 之中:</p>
+<pre class="code literal-block">
+#define INIT_SETUP(initsetup_align)         \
+    . = ALIGN(initsetup_align);             \
+    VMLINUX_SYMBOL(__setup_start) = .;      \
+    *(.init.setup)                          \
+    VMLINUX_SYMBOL(__setup_end) = .;
+</pre>
+<p>觀察 System.map 可以了解實際的布局 (下面是 x86_64 的 System.map)</p>
+<pre class="code literal-block">
+ffffffff81e7c9b0 T __setup_start
+ffffffff81e7c9c8 t __setup_rdinit_setup
+ffffffff81e7c9e0 t __setup_init_setup
+ffffffff81e7c9f8 t __setup_loglevel
+ffffffff81e7ca10 t __setup_quiet_kernel
+ffffffff81e7ca28 t __setup_debug_kernel
+...
+ffffffff81e7e5b8 T __setup_end
+</pre>
+<p>了解這個技巧，do_early_param() 的程式碼就很容易理解了，基本上就是逐個比較 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/init.h?v=4.1#L243">struct obs_kernel_param</a>
+是不是符合傳進來的 param name，若符合則將值傳入 setup_func() 中進行設定。</p>
+</blockquote>
+</div>
+<div class="section" id="module-param">
+<h2>Module param</h2>
+<p>上面討論的 obs_kernel_param 的 obs 是 obsolete 的意思，看起來是打算讓它功成身退，但是一直沒動作，就這樣一直放著...。 而用來取代舊的參數處理結構的是升級後的 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68">struct kernel_param</a>。從它被放在 include/linux/moduleparam.h 大概可以猜測新的結構主要是以支援模組參數為主，擴增到一般性的核心參數。</p>
+<blockquote>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">kernel_param</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param_ops</span> <span class="o">*</span><span class="n">ops</span><span class="p">;</span>
+    <span class="n">u16</span> <span class="n">perm</span><span class="p">;</span>
+    <span class="n">s8</span> <span class="n">level</span><span class="p">;</span>
+    <span class="n">u8</span> <span class="n">flags</span><span class="p">;</span>
+    <span class="k">union</span> <span class="p">{</span>
+        <span class="kt">void</span> <span class="o">*</span><span class="n">arg</span><span class="p">;</span>
+        <span class="k">const</span> <span class="k">struct</span> <span class="n">kparam_string</span> <span class="o">*</span><span class="n">str</span><span class="p">;</span>
+        <span class="k">const</span> <span class="k">struct</span> <span class="n">kparam_array</span> <span class="o">*</span><span class="n">arr</span><span class="p">;</span>
+    <span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+<p>新的 <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68">struct kernel_param</a> 更為一般化，物件化，kernel_param_ops 提供 set/get method，負責參數的設定與保存。除了在啟動時可以經由 bootloader 設定參數，開機之後，kernel_param
+也會被掛載到 sysfs 上，可以透過
+/sys/module/<span class="blue">&lt;module-name&gt;</span>/parameters/<span class="blue">&lt;param-name&gt;</span>
+讀取或設定參數。</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">kernel_param_ops</span> <span class="p">{</span>
+    <span class="cm">/* How the ops should behave */</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">flags</span><span class="p">;</span>
+    <span class="cm">/* Returns 0, or -errno.  arg is in kp-&gt;arg. */</span>
+    <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">set</span><span class="p">)(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param</span> <span class="o">*</span><span class="n">kp</span><span class="p">);</span>
+    <span class="cm">/* Returns length written or -errno.  Buffer is 4k (ie. be short!) */</span>
+    <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">get</span><span class="p">)(</span><span class="kt">char</span> <span class="o">*</span><span class="n">buffer</span><span class="p">,</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param</span> <span class="o">*</span><span class="n">kp</span><span class="p">);</span>
+    <span class="cm">/* Optional function to free kp-&gt;arg when module unloaded. */</span>
+    <span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="n">free</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span><span class="n">arg</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="cm">/* Special one for strings we want to copy into */</span>
+<span class="k">struct</span> <span class="n">kparam_string</span> <span class="p">{</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">maxlen</span><span class="p">;</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">string</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="cm">/* Special one for arrays */</span>
+<span class="k">struct</span> <span class="n">kparam_array</span>
+<span class="p">{</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">max</span><span class="p">;</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">elemsize</span><span class="p">;</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="o">*</span><span class="n">num</span><span class="p">;</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param_ops</span> <span class="o">*</span><span class="n">ops</span><span class="p">;</span>
+    <span class="kt">void</span> <span class="o">*</span><span class="n">elem</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<div class="highlight"><pre><span class="cm">/* This is the fundamental function for registering boot/module parameters. */</span>
+<span class="cp">#define __module_param_call(prefix, name, ops, arg, perm, level, flags) \</span>
+<span class="cp">    </span><span class="cm">/* Default value instead of permissions? */</span><span class="cp">                         \</span>
+<span class="cp">    static const char __param_str_##name[] = prefix #name;              \</span>
+<span class="hll"><span class="cp">    static struct kernel_param __moduleparam_const __param_##name       \</span>
+</span><span class="cp">    __used                                                              \</span>
+<span class="cp">    __attribute__ ((unused,__section__ (&quot;__param&quot;),aligned(sizeof(void *)))) \</span>
+<span class="cp">    = { __param_str_##name, ops, VERIFY_OCTAL_PERMISSIONS(perm), level, flags, { arg } }</span>
+</pre></div>
+<p><a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/moduleparam.h?v=4.1#L68">struct kernel_param</a> 主要是透過 __module_param_call() 這個 macro 來設定，與
+struct obs_kernel_param 類似，這個 macro 會將 __section__ (&quot;__param&quot;) 的屬性設給
+struct kernel_param 的資料，讓 linker 將資料集中在一起。</p>
+<p>另外，在上面的 macro 中我們可以發現如下的參數名宣告:</p>
+<pre class="code literal-block">
+static const char __param_str_##name[] = prefix #name;
+</pre>
+<p>這個字串會被指派給 struct kernel_param 的 name 欄位。新的 struct kernel_param 被引入的同時，參數的命名方式也做了調整，新的命名方式引入了
+module name 當作前綴 (prefix)，這是一種命名空間 (namespace) 的概念，新的命名規則讓各個模組更容易擁有屬於自已的參數，而不必太過煩腦命名衝突的問題。</p>
+<p>模組參數通常以 module_param() 或是以 module_param_named() 來宣告。
+以 &quot;printk&quot; 模組的 &quot;time&quot; 參數為例 (kernel/printk/printk.c: <a class="reference external" href="http://lxr.free-electrons.com/source/kernel/printk/printk.c?v=4.1#L996">printk_time</a>)，宣告如下:</p>
+<pre class="code literal-block">
+static bool printk_time = IS_ENABLED(CONFIG_PRINTK_TIME);
+module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
+</pre>
+<ul>
+<li><p class="first">name: <code>&quot;time&quot;</code> =&gt; <code>&quot;printk.time&quot;</code> with KBUILD_MODNAME &quot;printk&quot; and a &quot;.&quot; as prefix</p>
+</li>
+<li><p class="first">value: <code>printk_time</code> (the actual lvalue to alter)</p>
+</li>
+<li><p class="first">type: <code>bool</code> =&gt; <code>param_ops_bool</code> (the set &amp; get operations for this parameter)</p>
+</li>
+<li><p class="first">perm: <code>S_IRUGO | S_IWUSR</code></p>
+<p>the parameter <code>&quot;printk.time&quot;</code> can also be found at <em>/sys/module/printk/parameters/time</em></p>
+</li>
+</ul>
+<p>值的特別一提的是第三個參數 type：
+新的 struct kernel_param 針對像 bool, int, byte ... 等基礎的通用型態提供共用的
+struct kernel_param_ops 及其 set/get method，並以 <code>param_ops_##type</code> 命名。在上面例子中，&quot;printk.time&quot; 是 bool 型態的參數，會透過 <code>param_ops_bool</code> 存取設定。其他支援的型態請參照下面 module_param() 的註解說明。</p>
+</blockquote>
+<blockquote>
+<div class="highlight"><pre><span class="cm">/**</span>
+<span class="cm"> * module_param - typesafe helper for a module/cmdline parameter</span>
+<span class="cm"> * @value: the variable to alter, and exposed parameter name.</span>
+<span class="cm"> * @type: the type of the parameter</span>
+<span class="cm"> * @perm: visibility in sysfs.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @value becomes the module parameter, or (prefixed by KBUILD_MODNAME and a</span>
+<span class="cm"> * &quot;.&quot;) the kernel commandline parameter.  Note that - is changed to _, so</span>
+<span class="cm"> * the user can use &quot;foo-bar=1&quot; even for variable &quot;foo_bar&quot;.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @perm is 0 if the the variable is not to appear in sysfs, or 0444</span>
+<span class="cm"> * for world-readable, 0644 for root-writable, etc.  Note that if it</span>
+<span class="cm"> * is writable, you may need to use kparam_block_sysfs_write() around</span>
+<span class="cm"> * accesses (esp. charp, which can be kfreed when it changes).</span>
+<span class="cm"> *</span>
+<span class="cm"> * The @type is simply pasted to refer to a param_ops_##type and a</span>
+<span class="cm"> * param_check_##type: for convenience many standard types are provided but</span>
+<span class="cm"> * you can create your own by defining those variables.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Standard types are:</span>
+<span class="cm"> *  byte, short, ushort, int, uint, long, ulong</span>
+<span class="cm"> *  charp: a character pointer</span>
+<span class="cm"> *  bool: a bool, values 0/1, y/n, Y/N.</span>
+<span class="cm"> *  invbool: the above, only sense-reversed (N = true).</span>
+<span class="cm"> */</span>
+<span class="hll"><span class="cp">#define module_param(name, type, perm)   \</span>
+</span><span class="cp">    module_param_named(name, name, type, perm)</span>
+
+
+<span class="cm">/**</span>
+<span class="cm"> * module_param_named - typesafe helper for a renamed module/cmdline parameter</span>
+<span class="cm"> * @name: a valid C identifier which is the parameter name.</span>
+<span class="cm"> * @value: the actual lvalue to alter.</span>
+<span class="cm"> * @type: the type of the parameter</span>
+<span class="cm"> * @perm: visibility in sysfs.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Usually it&#39;s a good idea to have variable names and user-exposed names the</span>
+<span class="cm"> * same, but that&#39;s harder if the variable must be non-static or is inside a</span>
+<span class="cm"> * structure.  This allows exposure under a different name.</span>
+<span class="cm"> */</span>
+<span class="hll"><span class="cp">#define module_param_named(name, value, type, perm)            \</span>
+</span><span class="cp">    param_check_##type(name, &amp;(value));                        \</span>
+<span class="cp">    module_param_cb(name, &amp;param_ops_##type, &amp;value, perm);    \</span>
+<span class="cp">    __MODULE_PARM_TYPE(name, #type)</span>
+
+
+<span class="cm">/**</span>
+<span class="cm"> * module_param_cb - general callback for a module/cmdline parameter</span>
+<span class="cm"> * @name: a valid C identifier which is the parameter name.</span>
+<span class="cm"> * @ops: the set &amp; get operations for this parameter.</span>
+<span class="cm"> * @perm: visibility in sysfs.</span>
+<span class="cm"> *</span>
+<span class="cm"> * The ops can have NULL set or get functions.</span>
+<span class="cm"> */</span>
+<span class="hll"><span class="cp">#define module_param_cb(name, ops, arg, perm)  \</span>
+</span><span class="cp">    __module_param_call(MODULE_PARAM_PREFIX, name, ops, arg, perm, -1, 0)</span>
+</pre></div>
+<p>除了 module 外，struct kernel_param 也可用在一般核心的參數設定上，使用 core_param() macro 來宣告，因為不是給特定模組的參數，所以前綴 (prefix) 為空。</p>
+<div class="highlight"><pre><span class="cm">/**</span>
+<span class="cm"> * core_param - define a historical core kernel parameter.</span>
+<span class="cm"> * @name: the name of the cmdline and sysfs parameter (often the same as var)</span>
+<span class="cm"> * @var: the variable</span>
+<span class="cm"> * @type: the type of the parameter</span>
+<span class="cm"> * @perm: visibility in sysfs</span>
+<span class="cm"> *</span>
+<span class="cm"> * core_param is just like module_param(), but cannot be modular and</span>
+<span class="cm"> * doesn&#39;t add a prefix (such as &quot;printk.&quot;).  This is for compatibility</span>
+<span class="cm"> * with __setup(), and it makes sense as truly core parameters aren&#39;t</span>
+<span class="cm"> * tied to the particular file they&#39;re in.</span>
+<span class="cm"> */</span>
+<span class="hll"><span class="cp">#define core_param(name, var, type, perm)    \</span>
+</span><span class="cp">    param_check_##type(name, &amp;(var));        \</span>
+<span class="cp">    __module_param_call(&quot;&quot;, name, &amp;param_ops_##type, &amp;var, perm, -1, 0)</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="parse-args">
+<h2>parse_args</h2>
+<p><a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191">parse_args()</a> 負責解析字串參數，處理屬於 struct kernel_param 的參數設定，在核心啟動時由
+start_kernel() 處進入。</p>
+<blockquote>
+<div class="highlight"><pre><span class="n">asmlinkage</span> <span class="n">__visible</span> <span class="kt">void</span> <span class="n">__init</span> <span class="nf">start_kernel</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">command_line</span><span class="p">;</span>  <span class="c1">// a pointer to the kernel command line</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">after_dashes</span><span class="p">;</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+    <span class="n">pr_notice</span><span class="p">(</span><span class="s">&quot;Kernel command line: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">boot_command_line</span><span class="p">);</span>
+    <span class="n">parse_early_param</span><span class="p">();</span>              <span class="c1">// parse options for early_param()</span>
+<span class="hll">    <span class="n">after_dashes</span> <span class="o">=</span> <span class="n">parse_args</span><span class="p">(</span><span class="s">&quot;Booting kernel&quot;</span><span class="p">,</span> <span class="n">static_command_line</span><span class="p">,</span>  <span class="c1">// parse options for module_param(), module_param_named(), core_param()</span>
+</span>                  <span class="n">__start___param</span><span class="p">,</span>                   <span class="c1">// array of struct kernel_param</span>
+                  <span class="n">__stop___param</span> <span class="o">-</span> <span class="n">__start___param</span><span class="p">,</span>  <span class="c1">// number of params</span>
+                  <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">unknown_bootoption</span><span class="p">);</span>      <span class="c1">// parse options for __setup()</span>
+
+    <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+
+<span class="p">}</span>
+</pre></div>
+<p><a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191">parse_args()</a> 要求提供 kernel_param 的處理陣列。
+這邊和上面提到的 do_early_param() 使用一樣的技巧，
+__start___param 和 __stop___param 被定義在 linker script
+<em>include/asm-generic/vmlinux.lds.h</em> 裡，中間是 __param section，
+由 module_param(), module_param_named(), core_param() 等 macro 宣告的
+struct kernel_param 參數處理結構。</p>
+<pre class="code literal-block">
+/* Built-in module parameters. */             \
+__param : AT(ADDR(__param) - LOAD_OFFSET) {   \
+    VMLINUX_SYMBOL(__start___param) = .;      \
+    *(__param)                                \
+    VMLINUX_SYMBOL(__stop___param) = .;       \
+}
+</pre>
+<p>來看一下 System.map (x86_64)，觀察一下實際的布局情形:</p>
+<pre class="code literal-block">
+ffffffff81ba3768 R __start___param
+ffffffff81ba3788 r __param_dis_ucode_ldr
+ffffffff81ba37a8 r __param_trace_pc
+ffffffff81ba37c8 r __param_nommiotrace
+ffffffff81ba37e8 r __param_filter_offset
+ffffffff81ba3808 r __param_panic_on_warn
+ffffffff81ba3828 r __param_pause_on_oops
+ffffffff81ba3848 r __param_panic
+...
+ffffffff81ba55e8 R __stop___param
+</pre>
+</blockquote>
+<p><a class="reference external" href="http://lxr.free-electrons.com/source/kernel/params.c?v=4.1#L191">parse_args()</a> 的實作:</p>
+<blockquote>
+<ul class="simple">
+<li>由 next_arg() 解析出下一對的 param, value 組合</li>
+<li>由 parse_one() 對應到符合的 struct kernel_param 資料</li>
+</ul>
+<div class="highlight"><pre><span class="cm">/* Args looks like &quot;foo=bar,bar2 baz=fuz wiz&quot;. */</span>
+<span class="kt">char</span> <span class="o">*</span><span class="nf">parse_args</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">doing</span><span class="p">,</span>  <span class="c1">// doing message. e.g. &quot;early options&quot;, &quot;Booting kernel&quot;, &quot;Setting init args&quot;</span>
+         <span class="kt">char</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span>                 <span class="c1">// command line string</span>
+         <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param</span> <span class="o">*</span><span class="n">params</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="n">num</span><span class="p">,</span>  <span class="c1">// array of struct kernel_param</span>
+         <span class="n">s16</span> <span class="n">min_level</span><span class="p">,</span> <span class="n">s16</span> <span class="n">max_level</span><span class="p">,</span>
+         <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">unknown</span><span class="p">)(</span><span class="kt">char</span> <span class="o">*</span><span class="n">param</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">doing</span><span class="p">))</span>
+<span class="p">{</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">param</span><span class="p">,</span> <span class="o">*</span><span class="n">val</span><span class="p">;</span>
+
+    <span class="cm">/* Chew leading spaces */</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">skip_spaces</span><span class="p">(</span><span class="n">args</span><span class="p">);</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;doing %s, parsing ARGS: &#39;%s&#39;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">doing</span><span class="p">,</span> <span class="n">args</span><span class="p">);</span>
+
+    <span class="k">while</span> <span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kt">int</span> <span class="n">ret</span><span class="p">;</span>
+        <span class="kt">int</span> <span class="n">irq_was_disabled</span><span class="p">;</span>
+
+<span class="hll">        <span class="n">args</span> <span class="o">=</span> <span class="n">next_arg</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">param</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">val</span><span class="p">);</span>  <span class="c1">// get the next [param, val] pair</span>
+</span>        <span class="cm">/* Stop at -- */</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">val</span> <span class="o">&amp;&amp;</span> <span class="n">strcmp</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s">&quot;--&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">args</span><span class="p">;</span>
+        <span class="n">irq_was_disabled</span> <span class="o">=</span> <span class="n">irqs_disabled</span><span class="p">();</span>
+<span class="hll">        <span class="n">ret</span> <span class="o">=</span> <span class="n">parse_one</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">doing</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">num</span><span class="p">,</span>
+</span>                <span class="n">min_level</span><span class="p">,</span> <span class="n">max_level</span><span class="p">,</span> <span class="n">unknown</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">irq_was_disabled</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">irqs_disabled</span><span class="p">())</span>
+            <span class="n">pr_warn</span><span class="p">(</span><span class="s">&quot;%s: option &#39;%s&#39; enabled irq&#39;s!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">doing</span><span class="p">,</span> <span class="n">param</span><span class="p">);</span>
+
+        <span class="p">...</span> <span class="n">omitted</span> <span class="p">...</span>
+    <span class="p">}</span>
+
+    <span class="cm">/* All parsed OK. */</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>parse_one() 以線性搜尋的方式，比對出符合的 struct kernel_param。</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">int</span> <span class="nf">parse_one</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">param</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span>  <span class="c1">// the [param, val] pair</span>
+             <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">doing</span><span class="p">,</span>
+             <span class="k">const</span> <span class="k">struct</span> <span class="n">kernel_param</span> <span class="o">*</span><span class="n">params</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="n">num_params</span><span class="p">,</span>
+             <span class="n">s16</span> <span class="n">min_level</span><span class="p">,</span> <span class="n">s16</span> <span class="n">max_level</span><span class="p">,</span>
+             <span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">handle_unknown</span><span class="p">)(</span><span class="kt">char</span> <span class="o">*</span><span class="n">param</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">doing</span><span class="p">))</span>
+<span class="p">{</span>
+    <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">err</span><span class="p">;</span>
+
+    <span class="cm">/* Find parameter */</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">num_params</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+<span class="hll">        <span class="k">if</span> <span class="p">(</span><span class="n">parameq</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">name</span><span class="p">))</span> <span class="p">{</span>     <span class="c1">// match param&#39;s name with kernel_param</span>
+</span>            <span class="k">if</span> <span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">level</span> <span class="o">&lt;</span> <span class="n">min_level</span> <span class="o">||</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">level</span> <span class="o">&gt;</span> <span class="n">max_level</span><span class="p">)</span>
+                <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="cm">/* No one handled NULL, so do it here. */</span>
+            <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">val</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="n">KERNEL_PARAM_OPS_FL_NOARG</span><span class="p">))</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">EINVAL</span><span class="p">;</span>
+            <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;handling %s with %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">set</span><span class="p">);</span>
+            <span class="n">mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">param_lock</span><span class="p">);</span>
+            <span class="n">param_check_unsafe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="hll">            <span class="n">err</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">set</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>   <span class="c1">// call kernel_param_ops-&gt;set()</span>
+</span>            <span class="n">mutex_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">param_lock</span><span class="p">);</span>
+            <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">handle_unknown</span><span class="p">)</span> <span class="p">{</span>   <span class="c1">// handle_unknown = do_early_param(), or unknown_bootoption(), ...</span>
+        <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;doing %s: %s=&#39;%s&#39;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">doing</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">val</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">handle_unknown</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">doing</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;Unknown argument &#39;%s&#39;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">param</span><span class="p">);</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">ENOENT</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</blockquote>
+</div>
+<div class="section" id="reference">
+<h2>Reference</h2>
+<ul class="simple">
+<li>bootparam(7): <a class="reference external" href="http://man7.org/linux/man-pages/man7/bootparam.7.html">http://man7.org/linux/man-pages/man7/bootparam.7.html</a></li>
+<li>Kernel Parameters: <a class="reference external" href="https://www.kernel.org/doc/Documentation/kernel-parameters.txt">https://www.kernel.org/doc/Documentation/kernel-parameters.txt</a></li>
+<li>The Linux/x86 Boot Protocol: <a class="reference external" href="https://www.kernel.org/doc/Documentation/x86/boot.txt">https://www.kernel.org/doc/Documentation/x86/boot.txt</a></li>
+<li>Booting ARM Linux: <a class="reference external" href="https://www.kernel.org/doc/Documentation/arm/Booting">https://www.kernel.org/doc/Documentation/arm/Booting</a></li>
+</ul>
+</div>
+</div>
+    <footer>
+<p class="meta">
+  <span class="byline author vcard">
+    Posted by <span class="fn">
+        Daniel Lin
+    </span>
+  </span>
+<time datetime="2016-08-13T00:00:00+08:00" pubdate>2016-08-13, Sat</time>  <span class="categories">
+    <a class='category' href='https://danielmaker.github.io/blog/category/linux.html'>Linux</a>
+  </span>
+  <span class="categories">
+    <a class="category" href="https://danielmaker.github.io/blog/tag/linux-kernel.html">Linux kernel</a>  </span>
+</p><div class="sharing">
+</div>    </footer>
+  </article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript></div>
+  </section>
+</div>
+<aside class="sidebar">
+  <section>
+    <h1>Recent Posts</h1>
+    <ul id="recent_posts">
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">核心參數解析</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/inside_start_kernel.html">深入淺出 start_kernel()</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/start_kernel.html">核心的進入點: start_kernel()</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/linux_kernel_beginning.html">Linux Kernel 探險地圖</a>
+      </li>
+      <li class="post">
+          <a href="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.html">May The Source Be With You</a>
+      </li>
+    </ul>
+  </section>
+  <section>
+
+    <h1>Categories</h1>
+    <ul id="recent_posts">
+        <li><a href="https://danielmaker.github.io/blog/category/about.html">About</a></li>
+        <li><a href="https://danielmaker.github.io/blog/category/linux.html">Linux</a></li>
+    </ul>
+  </section>
+
+  <section>
+  <h1>Tags</h1>
+    <a href="https://danielmaker.github.io/blog/tag/linux-kernel.html">Linux kernel</a>  </section>
+
+
+
+
+  <!-- Creative Commons 授權條款 -->
+  <a target="_blank" class="svg" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW" style="display: inline-block;"
+     title="姓名標示-非商業性-相同方式分享 4.0"><object alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" data="https://danielmaker.github.io/blog/theme/images/by-nc-sa.svg" type="image/svg+xml" style="pointer-events: none;">/theme/images/by-nc-sa.svg</object></a>
+  <!-- Creative Commons 授權條款 -->
+</aside>    </div>
+  </div>
+  <footer role="contentinfo"><p>
+
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0"><img alt="CreativeCommons: 姓名標示-非商業性-相同方式分享 4.0" src="https://danielmaker.github.io/blog/theme/images/cc-by-nc-sa-88x31.png" border="0" /></a>
+
+    Copyright &copy;  2015&ndash;2016  Daniel Lin &mdash;
+
+  <!-- Creative Commons 授權條款 -->
+  本著作係採用
+  <a target="_blank" rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh_TW"
+     title="姓名標示-非商業性-相同方式分享 4.0">Creative Commons BY-NC-SA 條款</a> 授權.
+  <!-- Creative Commons 授權條款 -->
+
+  <span class="credit">Powered by <a href="http://getpelican.com">Pelican</a></span>
+</p></footer>
+  <script src="https://danielmaker.github.io/blog/theme/js/modernizr-2.0.js"></script>
+  <script src="https://danielmaker.github.io/blog/theme/js/ender.js"></script>
+  <script src="https://danielmaker.github.io/blog/theme/js/octopress.js" type="text/javascript"></script>
+    <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-71811903-1', 'auto');
+
+    ga('send', 'pageview');
+    </script>
+  <script type="text/javascript">
+    var disqus_shortname = 'danielmaker';
+    var disqus_identifier = '/linux/kernel_parameter_parsing.html';
+    var disqus_url = 'https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html';
+    var disqus_title = '核心參數解析';
+    (function() {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = "//" + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+  </script>
+</body>
+</html>
