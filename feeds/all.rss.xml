@@ -220,7 +220,7 @@ void __hlist_del(struct hlist_node* entry)
 &lt;li&gt;name: the name of the hash table&lt;/li&gt;
 &lt;li&gt;bits: the number of bits of hash values&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;第二的參數 bits 比較特別，它代表的是 hash value 的有效位元數。若 bits = 3，hash value 的範團會是 0~7，若 bits = 10，hash value 的範團會是 0 ~ 1023。前者需要準備 8 個 buckets，後者則需要 1024 個 buckets，bits 參數會決定 hash table 的 buckets 的數量 (=2 &lt;sup&gt;bits&lt;/sup&gt;)，實作上如上所示，是以 array 的方式來配置。&lt;/p&gt;
+&lt;p&gt;第二的參數 bits 比較特別，它代表的是 hash value 的有效位元數。若 bits = 3，hash value 的範團會是 0~7，若 bits = 10，hash value 的範團會是 0 ~ 1023。前者需要準備 8 個 buckets，後者則需要 1024 個 buckets，bits 參數會決定 hash table 的 buckets 的數量 (=2 &lt;sup&gt;bits&lt;/sup&gt;)。hashtable 實作上會以 hlist_head array 的方式來配置。&lt;/p&gt;
 &lt;p&gt;舉例來說， DEFINE_HASHTABLE(htable, 3) 會展開成:&lt;/p&gt;
 &lt;pre class="code literal-block"&gt;
 struct hlist_head htable[8] = { [0 ... 7] = HLIST_HEAD_INIT };
