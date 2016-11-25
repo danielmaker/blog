@@ -1,5 +1,387 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="https://danielmaker.github.io/blog/" rel="alternate"></link><link href="https://danielmaker.github.io/blog/feeds/all.atom.xml" rel="self"></link><id>https://danielmaker.github.io/blog/</id><updated>2016-08-13T00:00:00+08:00</updated><entry><title>核心參數解析</title><link href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html" rel="alternate"></link><updated>2016-08-13T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-08-13:blog/linux/kernel_parameter_parsing.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Daniel Jslin</title><link href="https://danielmaker.github.io/blog/" rel="alternate"></link><link href="https://danielmaker.github.io/blog/feeds/all.atom.xml" rel="self"></link><id>https://danielmaker.github.io/blog/</id><updated>2016-11-20T00:00:00+08:00</updated><entry><title>List, HList, and Hash Table</title><link href="https://danielmaker.github.io/blog/linux/list_hlist_hashtable.html" rel="alternate"></link><updated>2016-11-20T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-11-20:blog/linux/list_hlist_hashtable.html</id><summary type="html">&lt;div class="section" id="list"&gt;
+&lt;h2&gt;List&lt;/h2&gt;
+&lt;p&gt;List 可以說是 Linux kernel 中最基礎的資料結構，它的定義如下 (&lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/types.h?v=4.1#L177"&gt;include/linux/types.h&lt;/a&gt;):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre class="code literal-block"&gt;
+struct list_head {
+    struct list_head *next, *prev;
+};
+&lt;/pre&gt;
+&lt;object data="images/list.svg" type="image/svg+xml"&gt;
+&lt;/object&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;List 的操作定義在: &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/list.h?v=4.1"&gt;include/linux/list.h&lt;/a&gt;&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;list_empty(head) - tests whether a list is empty&lt;/li&gt;
+&lt;li&gt;list_add(new_entry, head) - adds a new entry. Insert a new entry after the specified head.&lt;/li&gt;
+&lt;li&gt;list_del(entry) - deletes entry from list.&lt;/li&gt;
+&lt;li&gt;list_for_each(pos, head) - iterate over a list&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;這個 list 結構有幾個特點:&lt;/p&gt;
+&lt;ol class="arabic"&gt;
+&lt;li&gt;&lt;p class="first"&gt;它是一個循環的雙向鏈結，沒有特定的&amp;quot;頭&amp;quot;和&amp;quot;尾&amp;quot;節點，每個節點都是可以是&amp;quot;頭&amp;quot;或是&amp;quot;尾&amp;quot;。
+這是一個非常優雅的設計，沒有&amp;quot;頭&amp;quot;和&amp;quot;尾&amp;quot;的特例，新增節點時只要將前一個節點的 next 指標和後面的節點的 prev 指標指向新節點，然後將新節點的 prev 和 next 指標各別指向前後節點 (為了方便說明，下面的程式碼和 kernel 有些許不同):&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+void __list_add(struct list_head *new_node,
+                struct list_head *prev,
+                struct list_head *next)
+{
+    prev-&amp;gt;next = new_node;
+    next-&amp;gt;prev = new_node;
+    new_node-&amp;gt;prev = prev;
+    new_node-&amp;gt;next = next;
+}
+&lt;/pre&gt;
+&lt;p&gt;移除節點時，只需把前節點的 next 指向後節點，後節點的 prev 指向前節點:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+void __list_del(struct list_head * prev, struct list_head * next)
+{
+    prev-&amp;gt;next = next;
+    next-&amp;gt;prev = prev;
+}
+
+// list_del - deletes entry from list
+void list_del(struct list_head *entry)
+{
+    __list_del(entry-&amp;gt;prev, entry-&amp;gt;next);
+}
+&lt;/pre&gt;
+&lt;p&gt;這樣完全不需要特別檢查是不是&amp;quot;頭&amp;quot;或&amp;quot;尾&amp;quot;節點，程式碼看起來非常優雅。
+要注意的是，從 list 中移除節點不包含釋放節點所佔的記憶體。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;!--  --&gt;
+&lt;ol class="arabic" start="2"&gt;
+&lt;li&gt;&lt;p class="first"&gt;只要一直順著 next 指標就可以將整個 list 走訪一遍。
+(由 head-&amp;gt;next 開始，當 pos 指回到 head 時停止尋訪)&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+/**
+ * list_for_each  - iterate over a list
+ * &amp;#64;pos:  the &amp;amp;struct list_head to use as a loop cursor.
+ * &amp;#64;head: the head for your list.
+ */
+#define list_for_each(pos, head) \
+  for (pos = (head)-&amp;gt;next; pos != (head); pos = pos-&amp;gt;next)
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;這是一個泛化 (generic) 的設計，任何 struct 只要將 list_head 加入它的欄位中，這個 struct
+就可以變成鏈結串列的節點。第一眼看到這個設計可能會覺得有點納悶，這跟我們在資料結構教科書上看到的鏈結串列設計不同。我們比較熟悉的鏈結串列結構應該像是這樣子:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+struct file_system_type {
+    const char* name;
+
+    struct file_system_type* next; /* next file_system_type in list */
+}
+
+有一個相同資料結構的 next 指標指向下一個節點。
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;blockquote&gt;
+&lt;p&gt;這樣的說明有點抽象，讓我們實際來看一個例子:&lt;/p&gt;
+&lt;p&gt;在下面的例子中，struct object 有一個 list_head 型態的成員: node&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;];&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;list_head&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="nf"&gt;list_add_example&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;LIST_HEAD&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;obj_list&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;// declare a list head&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj1&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj1&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;list_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj1&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj_list&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;// add a new entry after obj_list&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj2&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj2&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;list_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj2&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj_list&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;// add a new entry after obj_list&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj3&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj3&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;list_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj3&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj_list&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;// add a new entry after obj_list&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;在經過上面的操作之後，這個 list 會變成下面這個樣子:&lt;/p&gt;
+&lt;object data="images/obj_list.svg" type="image/svg+xml"&gt;
+&lt;/object&gt;
+&lt;p&gt;struct object 實際上是由 list_head 串起來。&lt;/p&gt;
+&lt;p&gt;利用 list_for_each 來走訪整個鏈結串列:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;list_head&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;iter&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="n"&gt;list_for_each&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;iter&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj_list&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;obj&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;list_entry&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;iter&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="n"&gt;printf&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;%s&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;輸出結果:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+obj3
+obj2
+obj1
+&lt;/pre&gt;
+&lt;p&gt;上面程式碼的一個重點在於利用 list_entry() 取得實體 struct object 的位址，而 list_entry() 實際上是由 container_of() 這個 macro 實現。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+/**
+ * list_entry - get the struct for this entry
+ * &amp;#64;ptr:  the &amp;amp;struct list_head pointer.
+ * &amp;#64;type: the type of the struct this is embedded in.
+ * &amp;#64;member: the name of the list_head within the struct.
+ */
+#define list_entry(ptr, type, member) \
+    container_of(ptr, type, member)
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="container-of"&gt;
+&lt;h2&gt;container_of()&lt;/h2&gt;
+&lt;p&gt;我們已知 struct object 的成員 node 的記憶體位址，那如果我們也知道成員 node 在 struct object
+裡的偏移量(offset)，這樣我們是不是可以推算出這個 struct object 結構體的位址？只要將成員 node 的位址依照偏移量往回推就可以得到 struct object 結構體的位址。&lt;/p&gt;
+&lt;p&gt;這個偏移量的推算可以由 offsetof() 這個 macro 完成:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a class="reference external" href="http://man7.org/linux/man-pages/man3/offsetof.3.html"&gt;http://man7.org/linux/man-pages/man3/offsetof.3.html&lt;/a&gt;&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+#undef offsetof
+#ifdef __compiler_offsetof
+#define offsetof(TYPE, MEMBER) __compiler_offsetof(TYPE, MEMBER)
+#else
+#define offsetof(TYPE, MEMBER) ((size_t) &amp;amp;((TYPE *)0)-&amp;gt;MEMBER)
+#endif
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;container_of() 這個神奇的 macro 就是利用 offsetof() 推算外部結構體的起始位址。
+以上面的例子來說，相對成員變數 node 而言，struct object 是它的容器(container)，container of node 就是 struct object。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre class="code literal-block"&gt;
+/**
+ * container_of - cast a member of a structure out to the containing structure
+ * &amp;#64;ptr:    the pointer to the member.
+ * &amp;#64;type:   the type of the container struct this is embedded in.
+ * &amp;#64;member: the name of the member within the struct.
+ */
+#define container_of(ptr, type, member) ({                 \
+    const typeof( ((type *)0)-&amp;gt;member ) *__mptr = (ptr);   \
+    (type *)( (char *)__mptr - offsetof(type, member) );})
+&lt;/pre&gt;
+&lt;p&gt;struct object* obj = container_of(ptr, struct object, node);&lt;/p&gt;
+&lt;object data="images/container_of.svg" type="image/svg+xml"&gt;
+&lt;/object&gt;
+&lt;p&gt;上面的示意圖假設 struct object 沒有經過任何的 padding 及 alignment。我們知道成員 node 的位址 ptr 的值，偏移量是 20，struct object* obj 的位址可以很簡單的由
+ptr - 20 = addr 來求得。 推薦閱讀: &lt;a class="reference external" href="http://radek.io/2012/11/10/magical-container_of-macro/"&gt;The Magical container_of() Macro&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="hlist-and-hashtable"&gt;
+&lt;h2&gt;HList and Hashtable&lt;/h2&gt;
+&lt;p&gt;HList 用於 hash table 的實作，它的資料結構定義在 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/types.h?v=4.1#L177"&gt;include/linux/types.h&lt;/a&gt; 之中:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre class="code literal-block"&gt;
+struct hlist_head {
+    struct hlist_node *first;
+};
+
+struct hlist_node {
+    struct hlist_node *next, **pprev;
+};
+&lt;/pre&gt;
+&lt;object data="images/hashtable.svg" type="image/svg+xml"&gt;
+&lt;/object&gt;
+&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;HList 的操作與 List 一樣定義在: &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/list.h?v=4.1"&gt;include/linux/list.h&lt;/a&gt; ，以 hlist_ 開頭&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;hlist_head 和 hlist_node 用於 hash table 中 bucket 的實作，具有相同 hash value 的節點會放在同一條 hlist 中。
+為了節省空間，hlist_head 只使用一個 first 指標指向 hlist_node，沒有指向串列尾節點的指標。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;hlist_node 有兩個指標，但是需要注意的是 pprev 是指標的指標，它指向的是前一個節點的 next 指標。
+這樣的好處是即使要刪除的節點是&amp;quot;最前頭的節點&amp;quot;時，也可以通過 *pprev = next 直接修改指標的指向。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+// deletes entry from hlist
+void __hlist_del(struct hlist_node* entry)
+{
+    struct hlist_node *next = entry-&amp;gt;next;
+    struct hlist_node **pprev = entry-&amp;gt;pprev;
+    *pprev = next;
+    if (next)
+      next-&amp;gt;pprev = pprev;
+}
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;在 Linux kernel 3.7 之後採用由 Sasha Levin 實作的通用型 hash table (&lt;a class="reference external" href="https://lwn.net/Articles/510202/"&gt;LWN: A generic hash table&lt;/a&gt;)，使用 DEFINE_HASHTABLE(name, bits) 的 macro 來宣告 hash table:&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;name: the name of the hash table&lt;/li&gt;
+&lt;li&gt;bits: the number of bits of hash values&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;第二的參數 bits 比較特別，它代表的是 hash value 的有效位元數。若 bits = 3，hash value 的範團會是 0~7，若 bits = 10，hash value 的範團會是 0 ~ 1023。前者需要準備 8 個 buckets，後者則需要 1024 個 buckets，bits 參數會決定 hash table 的 buckets 的數量 (=2 &lt;sup&gt;bits&lt;/sup&gt;)，實作上如上所示，是以 array 的方式來配置。&lt;/p&gt;
+&lt;p&gt;舉例來說， DEFINE_HASHTABLE(htable, 3) 會展開成:&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+struct hlist_head htable[8] = { [0 ... 7] = HLIST_HEAD_INIT };
+&lt;/pre&gt;
+&lt;p&gt;這是一個有 8 個 buckets 的 hash table。
+(初始化的語法請參照 &lt;a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Designated-Inits.html"&gt;GCC Designated Initializers&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;經由 hash function 將值映射到這 8 個 buckets 中，當衝突發生時，直接加到 hlist_head 後的串列中。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;hash table 相關的操作定義在 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/hashtable.h?v=4.1"&gt;include/linux/hashtable.h&lt;/a&gt;&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;hash_init - initialize a hash table&lt;/li&gt;
+&lt;li&gt;hash_empty - check whether a hashtable is empty&lt;/li&gt;
+&lt;li&gt;hash_add - add an object to a hashtable&lt;/li&gt;
+&lt;li&gt;hash_del - remove an object from a hashtable&lt;/li&gt;
+&lt;li&gt;hash_for_each - iterate over a hashtable&lt;/li&gt;
+&lt;li&gt;hash_for_each_possible - iterate over all possible objects hashing to the same bucket&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;hashtable 預設的 hash function 定義在 &lt;a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/hash.h?v=4.1"&gt;include/linux/hash.h&lt;/a&gt; ，有 32 和 64 兩個版本，如下:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */&lt;/span&gt;
+&lt;span class="cp"&gt;#define GOLDEN_RATIO_PRIME_32 0x9e370001UL&lt;/span&gt;
+
+&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="kr"&gt;inline&lt;/span&gt; &lt;span class="n"&gt;u32&lt;/span&gt; &lt;span class="nf"&gt;hash_32&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;u32&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;bits&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="cm"&gt;/* On some cpus multiply is faster, on others gcc will do shifts */&lt;/span&gt;
+    &lt;span class="n"&gt;u32&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;GOLDEN_RATIO_PRIME_32&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* High bits are more random, so use them. */&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;32&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;bits&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */&lt;/span&gt;
+&lt;span class="cp"&gt;#define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001UL&lt;/span&gt;
+
+&lt;span class="k"&gt;static&lt;/span&gt; &lt;span class="n"&gt;__always_inline&lt;/span&gt; &lt;span class="n"&gt;u64&lt;/span&gt; &lt;span class="nf"&gt;hash_64&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;u64&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="kt"&gt;unsigned&lt;/span&gt; &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;bits&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="n"&gt;u64&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+&lt;span class="cp"&gt;#if defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER) &amp;amp;&amp;amp; BITS_PER_LONG == 64&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;GOLDEN_RATIO_PRIME_64&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="cp"&gt;#else&lt;/span&gt;
+    &lt;span class="cm"&gt;/*  Sigh, gcc can&amp;#39;t optimise this alone like it does for 32 bits. */&lt;/span&gt;
+    &lt;span class="n"&gt;u64&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;18&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;-=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;33&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;-=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;-=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;4&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="cp"&gt;#endif&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* High bits are more random, so use them. */&lt;/span&gt;
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;hash&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;64&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;bits&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="section" id="hashtable-example"&gt;
+&lt;h3&gt;Hashtable example:&lt;/h3&gt;
+&lt;p&gt;下面用例子來說明 hashtable 的使用，將上面 list 例子中的 struct object 改成 hlist 的版本:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="kt"&gt;char&lt;/span&gt; &lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;];&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;hlist_node&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="nf"&gt;hashtable_example&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="c1"&gt;// define a hash table with 2^3(=8) buckets&lt;/span&gt;
+    &lt;span class="n"&gt;DEFINE_HASHTABLE&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="c1"&gt;// =&amp;gt; struct hlist_head htable[8] = { [0 ... 7] = HLIST_HEAD_INIT };&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj1&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj1&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;hash_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj1&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj1&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj2&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj2&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;hash_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj2&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj2&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj3&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj3&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;hash_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj3&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj3&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt; &lt;span class="n"&gt;obj9&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;9&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;obj9&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;};&lt;/span&gt;
+    &lt;span class="n"&gt;hash_add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;obj9&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj9&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;經過上面的操作之後，hash table 呈現如下:&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;obj1 和 obj9 的 hash value 衝突，放入同一個 bucket 的串列中&lt;/li&gt;
+&lt;/ul&gt;
+&lt;object data="images/hashtable_example.svg" type="image/svg+xml"&gt;
+&lt;/object&gt;
+&lt;p&gt;以 hash_for_each_possible() 尋訪 bucket 內所有的節點(hlist_node)，因為 hash value
+可能會有衝突的關係，同一個 bucket 內可能會有不同 key value 的節點，所以需要檢查是不是要查找的
+key value。&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="kt"&gt;int&lt;/span&gt; &lt;span class="n"&gt;key&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="k"&gt;struct&lt;/span&gt; &lt;span class="n"&gt;object&lt;/span&gt;&lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;obj&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="n"&gt;hash_for_each_possible&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;htable&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;key&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;obj&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;id&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;key&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="n"&gt;printf&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;key=%d =&amp;gt; %s&lt;/span&gt;&lt;span class="se"&gt;\n&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;key&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;obj&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;name&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="id1"&gt;
+&lt;h2&gt;小結&lt;/h2&gt;
+&lt;p&gt;List, HList and hashtable 是 Linux kernel 中常見的資料結構，它們的設計是經過高手長時間淬煉過的精華，但因為它們的實作及使用方式和我們常見的設計不同，對初次接觸 Linux kernel 的新手肯定會覺得相當的困惑，在了解之後，又會非常佩服 kernel hackers 在設計上的巧思。它們被設計的十分優雅，高效又易於使用。&lt;/p&gt;
+&lt;div class="section" id="id2"&gt;
+&lt;h3&gt;範例程式&lt;/h3&gt;
+&lt;p&gt;上面的範例程式可以在下面的 github 連結找到:&lt;/p&gt;
+&lt;p&gt;&lt;a class="reference external" href="https://github.com/danielmaker/linux_study/tree/master/list_example"&gt;https://github.com/danielmaker/linux_study/tree/master/list_example&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="reference"&gt;
+&lt;h2&gt;Reference&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://adrianhuang.blogspot.tw/2007/10/linux-kernel-listhead.html"&gt;Adrian: Linux Kernel: 強大又好用的 list_head 結構&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://nano-chicken.blogspot.tw/2009/09/linux-hlist.html"&gt;Nano 雞排: linux hlist&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;!--  --&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://adrianhuang.blogspot.tw/2010/01/linux-kernel-containerof.html"&gt;Adrian: Linux Kernel: container_of 巨集&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://radek.io/2012/11/10/magical-container_of-macro/"&gt;The Magical container_of() Macro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://stackoverflow.com/questions/6083734/rationale-behind-the-container-of-macro-in-linux-list-h"&gt;stackoverlow: Rationale behind the container_of macro&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://blog.linux.org.tw/~jserv/archives/001399.html"&gt;Jserv's blog: C99 的 offsetof macro&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;!--  --&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://lwn.net/Articles/510202/"&gt;LWN: A generic hash table&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="http://stackoverflow.com/questions/5489025/hash-table-in-linux-kernel"&gt;stackoverlow: Hash table in Linux kernel&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://kernelnewbies.org/FAQ/Hashtables"&gt;Kernel Newbies: How does the kernel implements Hashtables?&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;!--  --&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Designated-Inits.html"&gt;GCC Designated Initializers&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.reddit.com/r/HandmadeQuake/comments/4d6993/linus_torvaldss_double_pointer_problem/"&gt;Linus Torvalds's Double Pointer Problem&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+</summary><category term="Linux kernel"></category></entry><entry><title>核心參數解析</title><link href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html" rel="alternate"></link><updated>2016-08-13T00:00:00+08:00</updated><author><name>Daniel Lin</name></author><id>tag:danielmaker.github.io,2016-08-13:blog/linux/kernel_parameter_parsing.html</id><summary type="html">&lt;!-- ............................................................................. --&gt;
 &lt;style type="text/css"&gt;
     .red    { color: red;   }
     .blue   { color: blue;  }

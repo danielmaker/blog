@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="469pt" height="240pt" viewBox="-6 -37 463 203" xmlns="http://www.w3.org/2000/svg">
+  <title>list</title>
+  <rect x="-1.22" y="32.297" width="92.293" height="101.941" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); vector-effect: non-scaling-stroke;"/>
+  <g id="node1" class="node" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node0</title>
+    <polygon stroke="black" points="0,-43.5745 0,-87.5745 80.9795,-87.5745 80.9795,-43.5745 0,-43.5745" style="fill: rgb(255, 255, 255);"/>
+    <text text-anchor="middle" x="40.4897" y="-72.3745" font-family="Times,serif" font-size="14.00" style="white-space: pre;">list_head</text>
+    <polyline fill="none" stroke="black" points="0,-65.5745 80.9795,-65.5745 "/>
+    <text text-anchor="middle" x="20.438" y="-50.3745" font-family="Times,serif" font-size="14.00" style="white-space: pre;">prev</text>
+    <polyline fill="none" stroke="black" points="40.876,-43.5745 40.876,-65.5745 "/>
+    <text text-anchor="middle" x="60.9277" y="-50.3745" font-family="Times,serif" font-size="14.00" style="white-space: pre;">next</text>
+  </g>
+  <rect x="115.32" y="-29.383" width="92.293" height="163.621" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); vector-effect: non-scaling-stroke;"/>
+  <polygon stroke="black" points="120.979 119.246 120.979 75.246 201.959 75.246 201.959 119.246 120.979 119.246" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="161.469" y="90.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">list_head</text>
+  <polyline fill="none" stroke="black" points="120.979 97.246 201.959 97.246"/>
+  <text text-anchor="middle" x="141.417" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">prev</text>
+  <polyline fill="none" stroke="black" points="161.855 119.246 161.855 97.246"/>
+  <text text-anchor="middle" x="181.907" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">next</text>
+  <polygon fill="black" stroke="black" points="110.025 96.563 120.594 97.305 111.869 103.316 110.025 96.563"/>
+  <polygon fill="gray" stroke="gray" points="165.406 130.083 161.469 120.246 170.681 125.481 165.406 130.083"/>
+  <polygon stroke="black" points="118.964 50.733 118.964 28.604 199.944 28.604 199.944 50.733 118.964 50.733" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="159.454" y="43.804" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">name="obj3"</text>
+  <text text-anchor="middle" x="161.476" y="-11.896" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">object</text>
+  <polygon stroke="black" points="118.964 24.488 118.964 2.359 199.944 2.359 199.944 24.488 118.964 24.488" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="158.985" y="17.559" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">id=3</text>
+  <g id="node2" class="node" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node1</title>
+  </g>
+  <g id="edge3" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node0:next-&gt;node1:c</title>
+    <path fill="none" stroke="black" d="M80.9795,-54.5745C93.5588,-54.5745 98.2193,-59.396 106.791,-62.8391"/>
+  </g>
+  <rect x="232.36" width="92.293" height="163.621" style="fill: rgb(216, 216, 216); vector-effect: non-scaling-stroke; stroke: rgb(0, 0, 0);" y="-29.383"/>
+  <polygon stroke="black" points="237.959 119.246 237.959 75.246 318.938 75.246 318.938 119.246 237.959 119.246" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="278.449" y="90.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">list_head</text>
+  <polyline fill="none" stroke="black" points="237.959 97.246 318.938 97.246"/>
+  <text text-anchor="middle" x="258.397" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">prev</text>
+  <polyline fill="none" stroke="black" points="278.835 119.246 278.835 97.246"/>
+  <text text-anchor="middle" x="298.887" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">next</text>
+  <polygon stroke="black" points="237.503 50.733 237.503 28.604 318.483 28.604 318.483 50.733 237.503 50.733" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="277.992" y="43.804" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">name="obj2"</text>
+  <text text-anchor="middle" x="278.521" y="-12.326" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">object</text>
+  <polygon stroke="black" points="237.502 24.488 237.502 2.359 318.482 2.359 318.482 24.488 237.502 24.488" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="277.523" y="17.559" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">id=2</text>
+  <polygon fill="black" stroke="black" points="227.005 96.563 237.574 97.305 228.849 103.316 227.005 96.563"/>
+  <g id="node3" class="node" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node2</title>
+  </g>
+  <rect x="344.778" width="92.293" height="163.621" style="fill: rgb(216, 216, 216); vector-effect: non-scaling-stroke; stroke: rgb(0, 0, 0);" y="-29.383"/>
+  <g id="edge2" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node0:prev:s-&gt;node2:s</title>
+    <path fill="none" stroke="gray" d="M 20.49 -42.574 C 20.49 10.334 357.207 11.426 385.108 -34.869"/>
+  </g>
+  <g id="edge5" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node1:prev:sw-&gt;node0:s</title>
+    <path fill="none" stroke="gray" d="M118.469,-43.5745C96.737,-21.8423 52.2326,-10.6121 42.4284,-32.5119"/>
+    <polygon fill="gray" stroke="gray" points="38.9449,-32.0929 40.4897,-42.5745 45.8185,-33.4173 38.9449,-32.0929"/>
+  </g>
+  <g id="edge6" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node1:next-&gt;node2:c</title>
+    <path fill="none" stroke="black" d="M197.959,-54.5745C210.538,-54.5745 215.199,-59.396 223.771,-62.8391"/>
+  </g>
+  <polygon fill="gray" stroke="gray" points="385.059 129.422 391.186 120.778 391.786 131.356 385.059 129.422"/>
+  <g id="edge8" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node2:next:ne-&gt;node0:n</title>
+    <polygon fill="black" stroke="black" points="37.827 -87.743 37.527 -87.879 43.619 -97.443 47.808 -90.367" transform=""/>
+    <path fill="none" stroke="black" d="M 428.122 -57.462 C 549.888 -127.26 97.14 -100.541 44.841 -93.311"/>
+  </g>
+  <g id="edge7" class="edge" transform="matrix(1, 0, 0, 1, 4, 162.820999)">
+    <title>node2:prev:sw-&gt;node1:s</title>
+    <path fill="none" stroke="gray" d="M235.449,-43.5745C225.588,-33.7136 181.103,-27.8534 164.103,-34.9703"/>
+  </g>
+  <title>node0</title>
+  <g transform="matrix(1, 0, 0, 1, 215.206161, -62.987171)"/>
+  <g transform="matrix(1, 0, 0, 1, 333.744507, -62.987171)"/>
+  <polygon fill="none" stroke="none" points="0 166.821 0 0 337.275 0 337.275 166.821 0 166.821"/>
+  <g transform="matrix(1, 0, 0, 1, 214.736725, -89.232269)"/>
+  <g transform="matrix(1, 0, 0, 1, 333.275055, -89.232269)"/>
+  <polygon stroke="black" points="350.377 119.246 350.377 75.246 431.356 75.246 431.356 119.246 350.377 119.246" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="390.867" y="90.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">list_head</text>
+  <polyline fill="none" stroke="black" points="350.377 97.246 431.356 97.246"/>
+  <text text-anchor="middle" x="370.815" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">prev</text>
+  <polyline fill="none" stroke="black" points="391.253 119.246 391.253 97.246"/>
+  <text text-anchor="middle" x="411.305" y="112.447" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">next</text>
+  <polygon stroke="black" points="349.921 50.733 349.921 28.604 430.901 28.604 430.901 50.733 349.921 50.733" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="390.41" y="43.804" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">name="obj1"</text>
+  <text text-anchor="middle" x="390.939" y="-12.326" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">object</text>
+  <polygon stroke="black" points="349.92 24.488 349.92 2.359 430.9 2.359 430.9 24.488 349.92 24.488" style="fill: rgb(255, 255, 255);"/>
+  <text text-anchor="middle" x="389.941" y="17.559" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">id=1</text>
+  <polygon fill="black" stroke="black" points="339.423 96.563 349.992 97.305 341.267 103.316 339.423 96.563"/>
+  <path fill="none" stroke="black" d="M 318.491 106.772 C 331.07 106.772 335.731 101.95 344.303 98.507"/>
+  <g transform="matrix(1, 0, 0, 1, 14.164306, 8.005912)">
+    <g>
+      <g transform="matrix(1, 0, 0, 1, -19.254658, -54.03727)">
+        <polygon fill="gray" stroke="gray" points="288 176.101 284.063 166.264 293.275 171.499 288 176.101"/>
+        <path fill="none" stroke="gray" d="M 362.043 165.265 C 352.182 175.126 307.697 180.986 290.697 173.869"/>
+      </g>
+    </g>
+    <g id="g-1" class="edge" transform="matrix(1, 0, 0, 1, 126.593811, 208.839691)">
+      <title>node2:prev:sw-&gt;node1:s</title>
+    </g>
+  </g>
+  <text text-anchor="middle" x="44.923" y="49.159" font-family="Times,serif" font-size="14.00" style="white-space: pre; font-size: 14px;">obj_list</text>
+</svg>

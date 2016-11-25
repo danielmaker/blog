@@ -62,6 +62,36 @@
   		<article>
 <header>
       <h1 class="entry-title">
+        <a href="https://danielmaker.github.io/blog/linux/list_hlist_hashtable.html">List, HList, and Hash Table</a>
+      </h1>
+    <p class="meta">
+<time datetime="2016-11-20T00:00:00+08:00" pubdate>2016-11-20, Sun</time>    </p>
+</header>
+
+  <div class="entry-content"><div class="section" id="list">
+<h2>List</h2>
+<p>List 可以說是 Linux kernel 中最基礎的資料結構，它的定義如下 (<a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/types.h?v=4.1#L177">include/linux/types.h</a>):</p>
+<blockquote>
+<pre class="code literal-block">
+struct list_head {
+    struct list_head *next, *prev;
+};
+</pre>
+<object data="images/list.svg" type="image/svg+xml">
+</object>
+</blockquote>
+<p>List 的操作定義在: <a class="reference external" href="http://lxr.free-electrons.com/source/include/linux/list.h?v=4.1">include/linux/list.h</a></p>
+<ul class="simple">
+<li>list_empty(head) - tests whether a list is empty</li>
+<li>list_add(new_entry, head) - adds a new entry. Insert a new entry after the specified head.</li>
+<li>list_del(entry) - deletes entry ...</li></ul></div></div>
+  <footer>
+    <a rel="full-article" href="https://danielmaker.github.io/blog/linux/list_hlist_hashtable.html">Read On &crarr;</a>
+  </footer>
+  		</article>
+  		<article>
+<header>
+      <h1 class="entry-title">
         <a href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">核心參數解析</a>
       </h1>
     <p class="meta">
@@ -240,6 +270,9 @@ param[=value_1][,value_2]...[,value_10]</blockquote>
     <h1>Recent Posts</h1>
     <ul id="recent_posts">
       <li class="post">
+          <a href="https://danielmaker.github.io/blog/linux/list_hlist_hashtable.html">List, HList, and Hash Table</a>
+      </li>
+      <li class="post">
           <a href="https://danielmaker.github.io/blog/linux/kernel_parameter_parsing.html">核心參數解析</a>
       </li>
       <li class="post">
@@ -250,9 +283,6 @@ param[=value_1][,value_2]...[,value_10]</blockquote>
       </li>
       <li class="post">
           <a href="https://danielmaker.github.io/blog/linux/linux_kernel_beginning.html">Linux Kernel 探險地圖</a>
-      </li>
-      <li class="post">
-          <a href="https://danielmaker.github.io/blog/about/may-the-source-be-with-you.html">May The Source Be With You</a>
       </li>
     </ul>
   </section>
